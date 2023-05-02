@@ -7,13 +7,13 @@ const UPDATE_INTERVAL = 1000;
 
 function setDiceIcon() {
     const sendButton = document.getElementById('roll_dice');
-    sendButton.style.backgroundImage = `url(/img/dice-solid.svg)`;
+    /* sendButton.style.backgroundImage = `url(/img/dice-solid.svg)`; */
     sendButton.classList.remove('spin');
 }
 
 async function doDiceRoll() {
     let value = $(this).data('value');
-    
+
     if (value == 'custom') {
         value = await callPopup('Enter the dice formula:<br><i>(for example, <tt>2d6</tt>)</i>', 'input');
     }
@@ -29,22 +29,24 @@ async function doDiceRoll() {
 
 function addDiceRollButton() {
     const buttonHtml = `
-        <input id="roll_dice" type="button" />
-        <div id="dice_dropdown">
-            <ul class="list-group">
-                <li class="list-group-item" data-value="d4">d4</li>
-                <li class="list-group-item" data-value="d6">d6</li>
-                <li class="list-group-item" data-value="d8">d8</li>
-                <li class="list-group-item" data-value="d10">d10</li>
-                <li class="list-group-item" data-value="d12">d12</li>
-                <li class="list-group-item" data-value="d20">d20</li>
-                <li class="list-group-item" data-value="d100">d100</li>
-                <li class="list-group-item" data-value="custom">...</li>
-            </ul>
-        </div>
+        <div id="roll_dice" class="fa-solid fa-dice" /></div>
         `;
+    const dropdownHtml = `
+    <div id="dice_dropdown">
+        <ul class="list-group">
+            <li class="list-group-item" data-value="d4">d4</li>
+            <li class="list-group-item" data-value="d6">d6</li>
+            <li class="list-group-item" data-value="d8">d8</li>
+            <li class="list-group-item" data-value="d10">d10</li>
+            <li class="list-group-item" data-value="d12">d12</li>
+            <li class="list-group-item" data-value="d20">d20</li>
+            <li class="list-group-item" data-value="d100">d100</li>
+            <li class="list-group-item" data-value="custom">...</li>
+        </ul>
+    </div>`;
 
     $('#send_but_sheld').prepend(buttonHtml);
+    $(document.body).append(dropdownHtml)
     $('#dice_dropdown li').on('click', doDiceRoll);
     const button = $('#roll_dice');
     const dropdown = $('#dice_dropdown');
@@ -77,13 +79,6 @@ function addDiceScript() {
     }
 }
 
-function patchSendForm() {
-    const columns = $('#send_form').css('grid-template-columns').split(' ');
-    columns[columns.length - 1] = `${parseInt(columns[columns.length - 1]) + 40}px`;
-    columns[1] = 'auto';
-    $('#send_form').css('grid-template-columns', columns.join(' '));
-}
-
 async function moduleWorker() {
     const context = getContext();
 
@@ -95,7 +90,6 @@ async function moduleWorker() {
 $(document).ready(function () {
     addDiceScript();
     addDiceRollButton();
-    patchSendForm();
     setDiceIcon();
     moduleWorker();
     setInterval(moduleWorker, UPDATE_INTERVAL);

@@ -1,3 +1,27 @@
+#!/usr/bin/env node
+
+const process = require('process')
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
+
+const cliArguments = yargs(hideBin(process.argv))
+    .option('ssl', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enables SSL'
+    }).option('certPath', {
+        type: 'string',
+        default: 'certs/cert.pem',
+        describe: 'Path to your certificate file.'
+    }).option('keyPath', {
+        type: 'string',
+        default: 'certs/privkey.pem',
+        describe: 'Path to your private key file.'
+    }).argv;
+
+// change all relative paths
+process.chdir(__dirname)
+
 const express = require('express');
 const compression = require('compression');
 const app = express();
@@ -9,7 +33,9 @@ const open = require('open');
 
 const rimraf = require("rimraf");
 const multer = require("multer");
+const http = require("http");
 const https = require('https');
+const basicAuthMiddleware = require('./src/middleware/basicAuthMiddleware');
 //const PNG = require('pngjs').PNG;
 const extract = require('png-chunks-extract');
 const encode = require('png-chunks-encode');
@@ -29,16 +55,27 @@ const ExifReader = require('exifreader');
 const exif = require('piexifjs');
 const webp = require('webp-converter');
 
-const config = require(path.join(process.cwd(), './config.conf'));
+const config = require(path.join(__dirname, './config.conf'));
 const server_port = process.env.SILLY_TAVERN_PORT || config.port;
-const whitelist = config.whitelist;
+
+const whitelistPath = path.join(__dirname, "./whitelist.txt");
+let whitelist = config.whitelist;
+
+if (fs.existsSync(whitelistPath)) {
+    try {
+        let whitelistTxt = fs.readFileSync(whitelistPath, 'utf-8');
+        whitelist = whitelistTxt.split("\n").filter(ip => ip).map(ip => ip.trim());
+    } catch (e) { }
+}
+
 const whitelistMode = config.whitelistMode;
-const autorun = config.autorun;
+const autorun = config.autorun && !cliArguments.ssl;
 const enableExtensions = config.enableExtensions;
 const listen = config.listen;
 
 const axios = require('axios');
 const tiktoken = require('@dqbd/tiktoken');
+const WebSocket = require('ws');
 
 var Client = require('node-rest-client').Client;
 var client = new Client();
@@ -116,6 +153,8 @@ const directories = {
     thumbnails: 'thumbnails/',
     thumbnailsBg: 'thumbnails/bg/',
     thumbnailsAvatar: 'thumbnails/avatar/',
+    themes: 'public/themes',
+    extensions: 'public/scripts/extensions'
 };
 
 // CSRF Protection //
@@ -156,6 +195,8 @@ const CORS = cors({
 
 app.use(CORS);
 
+if (listen && config.basicAuthMode) app.use(basicAuthMiddleware);
+
 app.use(function (req, res, next) { //Security
     let clientIp = req.connection.remoteAddress;
     let ip = ipaddr.parse(clientIp);
@@ -170,8 +211,8 @@ app.use(function (req, res, next) { //Security
 
     //clientIp = req.connection.remoteAddress.split(':').pop();
     if (whitelistMode === true && !whitelist.includes(clientIp)) {
-        console.log('Forbidden: Connection attempt from ' + clientIp + '. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of TavernAI folder.\n');
-        return res.status(403).send('<b>Forbidden</b>: Connection attempt from <b>' + clientIp + '</b>. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of TavernAI folder.');
+        console.log('Forbidden: Connection attempt from ' + clientIp + '. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of SillyTavern folder.\n');
+        return res.status(403).send('<b>Forbidden</b>: Connection attempt from <b>' + clientIp + '</b>. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of SillyTavern folder.');
     }
     next();
 });
@@ -198,7 +239,7 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname + "/public", { refresh: true }));
 
 app.use('/backgrounds', (req, res) => {
-    const filePath = decodeURIComponent(path.join(process.cwd(), 'public/backgrounds', req.url.replace(/%20/g, ' ')));
+    const filePath = decodeURIComponent(path.join(__dirname, 'public/backgrounds', req.url.replace(/%20/g, ' ')));
     fs.readFile(filePath, (err, data) => {
         if (err) {
             res.status(404).send('File not found');
@@ -210,24 +251,21 @@ app.use('/backgrounds', (req, res) => {
 });
 
 app.use('/characters', (req, res) => {
-    const filePath = decodeURIComponent(path.join(process.cwd(), charactersPath, req.url.replace(/%20/g, ' ')));
+    const filePath = decodeURIComponent(path.join(__dirname, charactersPath, req.url.replace(/%20/g, ' ')));
     fs.readFile(filePath, (err, data) => {
         if (err) {
             res.status(404).send('File not found');
             return;
         }
-        //res.contentType('image/jpeg');
         res.send(data);
     });
 });
 app.use(multer({ dest: "uploads" }).single("avatar"));
 app.get("/", function (request, response) {
     response.sendFile(__dirname + "/public/index.html");
-    //response.send("<h1>Главная страница</h1>");
 });
 app.get("/notes/*", function (request, response) {
     response.sendFile(__dirname + "/public" + request.url + ".html");
-    //response.send("<h1>Главная страница</h1>");
 });
 
 //**************Kobold api
@@ -272,6 +310,9 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
             sampler_order: sampler_order,
             singleline: !!request.body.singleline,
         };
+        if (!!request.body.stop_sequence) {
+            this_settings['stop_sequence'] = request.body.stop_sequence;
+        }
     }
 
     console.log(this_settings);
@@ -309,69 +350,130 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
 });
 
 //************** Text generation web UI
-app.post("/generate_textgenerationwebui", jsonParser, function (request, response_generate = response) {
+app.post("/generate_textgenerationwebui", jsonParser, async function (request, response_generate = response) {
     if (!request.body) return response_generate.sendStatus(400);
 
     console.log(request.body);
-    var args = {
-        data: request.body,
-        headers: { "Content-Type": "application/json" }
-    };
-    client.post(api_server + "/run/textgen", args, function (data, response) {
-        console.log("####", data);
-        if (response.statusCode == 200) {
-            console.log(data);
-            response_generate.send(data);
+
+    if (!!request.header('X-Response-Streaming')) {
+        let isStreamingStopped = false;
+        request.socket.on('close', function () {
+            isStreamingStopped = true;
+        });
+
+        response_generate.writeHead(200, {
+            'Content-Type': 'text/plain;charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'Cache-Control': 'no-transform',
+        });
+
+        async function* readWebsocket() {
+            const streamingUrl = request.header('X-Streaming-URL');
+            const websocket = new WebSocket(streamingUrl); 
+
+            websocket.on('open', async function () {
+                console.log('websocket open');
+                websocket.send(JSON.stringify(request.body));
+            });
+
+            websocket.on('error', (err) => {
+                console.error(err);
+                websocket.close();
+            });
+
+            websocket.on('close', (code, buffer) => {
+                const reason = new TextDecoder().decode(buffer)
+                console.log(reason);
+            });
+
+            while (true) {
+                if (isStreamingStopped) {
+                    console.error('Streaming stopped by user. Closing websocket...');
+                    websocket.close();
+                    return;
+                }
+
+                const rawMessage = await new Promise(resolve => websocket.once('message', resolve));
+                const message = json5.parse(rawMessage);
+
+                switch (message.event) {
+                    case 'text_stream':
+                        yield message.text;
+                        break;
+                    case 'stream_end':
+                        websocket.close();
+                        return;
+                }
+            }
         }
-        if (response.statusCode == 422) {
-            console.log('Validation error');
+
+        let reply = '';
+
+        try {
+            for await (const text of readWebsocket()) {
+                if (typeof text !== 'string') {
+                    break;
+                }
+
+                let newText = text;
+
+                if (!newText) {
+                    continue;
+                }
+
+                reply += text;
+                response_generate.write(newText);
+            }
+
+            console.log(reply);
+        }
+        finally {
+            response_generate.end();
+        }
+    }
+    else {
+        var args = {
+            data: request.body,
+            headers: { "Content-Type": "application/json" }
+        };
+        client.post(api_server + "/v1/generate", args, function (data, response) {
+            console.log("####", data);
+            if (response.statusCode == 200) {
+                console.log(data);
+                response_generate.send(data);
+            }
+            if (response.statusCode == 422) {
+                console.log('Validation error');
+                response_generate.send({ error: true });
+            }
+            if (response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507) {
+                console.log(data);
+                response_generate.send({ error: true });
+            }
+        }).on('error', function (err) {
+            console.log(err);
+            //console.log('something went wrong on the request', err.request.options);
             response_generate.send({ error: true });
-        }
-        if (response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507) {
-            console.log(data);
-            response_generate.send({ error: true });
-        }
-    }).on('error', function (err) {
-        console.log(err);
-        //console.log('something went wrong on the request', err.request.options);
-        response_generate.send({ error: true });
-    });
+        });
+    }
 });
 
 
 app.post("/savechat", jsonParser, function (request, response) {
-    //console.log(humanizedISO8601DateTime()+':/savechat/ entered');
-    //console.log(request.data);
-    //console.log(request.body.bg);
-    //const data = request.body;
-    //console.log(request);
-    //console.log(request.body.chat);
-    //var bg = "body {background-image: linear-gradient(rgba(19,21,44,0.75), rgba(19,21,44,0.75)), url(../backgrounds/"+request.body.bg+");}";
     var dir_name = String(request.body.avatar_url).replace('.png', '');
-    //console.log(humanizedISO8601DateTime()+':/savechat sees '+dir_name+' as the character name (derived from avatar PNG filename)');
     let chat_data = request.body.chat;
     let jsonlData = chat_data.map(JSON.stringify).join('\n');
-    //console.log(humanizedISO8601DateTime()+':/savechat saving a chat named '+request.body.file_name+'.jsonl');
     fs.writeFile(chatsPath + dir_name + "/" + request.body.file_name + '.jsonl', jsonlData, 'utf8', function (err) {
         if (err) {
             response.send(err);
             return console.log(err);
-            //response.send(err);
         } else {
-            //response.redirect("/");
             response.send({ result: "ok" });
         }
     });
 
 });
 app.post("/getchat", jsonParser, function (request, response) {
-    //console.log(request.data);
-    //console.log(request.body.bg);
-    //const data = request.body;
-    //console.log(request);
-    //console.log(request.body.chat);
-    //var bg = "body {background-image: linear-gradient(rgba(19,21,44,0.75), rgba(19,21,44,0.75)), url(../backgrounds/"+request.body.bg+");}";
-    //console.log(humanizedISO8601DateTime()+':/getchat entered');
     var dir_name = String(request.body.avatar_url).replace('.png', '');
 
     fs.stat(chatsPath + dir_name, function (err, stat) {
@@ -388,7 +490,6 @@ app.post("/getchat", jsonParser, function (request, response) {
                 fs.stat(chatsPath + dir_name + "/" + request.body.file_name + ".jsonl", function (err, stat) {
 
                     if (err === null) { //if no error (the file exists), read the file
-                        //console.log(humanizedISO8601DateTime()+':/getchat tries to access: '+chatsPath+dir_name+'/'+request.body.file_name+'.jsonl');                        
                         if (stat !== undefined) {
                             fs.readFile(chatsPath + dir_name + "/" + request.body.file_name + ".jsonl", 'utf8', (err, data) => {
                                 if (err) {
@@ -422,7 +523,7 @@ app.post("/getchat", jsonParser, function (request, response) {
 
 
 });
-app.post("/getstatus", jsonParser, function (request, response_getstatus = response) {
+app.post("/getstatus", jsonParser, async function (request, response_getstatus = response) {
     if (!request.body) return response_getstatus.sendStatus(400);
     api_server = request.body.api_server;
     main_api = request.body.main_api;
@@ -433,44 +534,27 @@ app.post("/getstatus", jsonParser, function (request, response_getstatus = respo
         headers: { "Content-Type": "application/json" }
     };
     var url = api_server + "/v1/model";
-    if (main_api == "textgenerationwebui") {
-        url = api_server;
-        args = {}
+    let version = '';
+    if (main_api == "kobold") {
+        try {
+            version = (await getAsync(api_server + "/v1/info/version")).result;
+        }
+        catch {
+            version = '0.0.0';
+        }
     }
     client.get(url, args, function (data, response) {
         if (response.statusCode == 200) {
-            if (main_api == "textgenerationwebui") {
-                // console.log(body);
-                try {
-                    var body = data.toString();
-                    var response = body.match(/gradio_config[ =]*(\{.*\});/)[1];
-                    if (!response)
-                        throw "no_connection";
-                    let model = json5.parse(response).components.filter((x) => x.props.label == "Model" && x.type == "dropdown")[0].props.value;
-                    data = { result: model };
-                    if (!data)
-                        throw "no_connection";
-                } catch {
-                    data = { result: "no_connection" };
-                }
+            data.version = version;
+            if (data.result != "ReadOnly") {
             } else {
-                if (data.result != "ReadOnly") {
-                    //response_getstatus.send(data.result);
-                } else {
-                    data.result = "no_connection";
-                }
+                data.result = "no_connection";
             }
         } else {
             data.result = "no_connection";
         }
         response_getstatus.send(data);
-        //console.log(response.statusCode);
-        //console.log(data);
-        //response_getstatus.send(data);
-        //data.results[0].text
     }).on('error', function (err) {
-        //console.log(url);
-        //console.log('something went wrong on the request', err.request.options);
         response_getstatus.send({ result: "no_connection" });
     });
 });
@@ -519,26 +603,21 @@ app.post("/setsoftprompt", jsonParser, async function (request, response) {
 });
 
 function checkServer() {
-    //console.log('Check run###################################################');
     api_server = 'http://127.0.0.1:5000';
     var args = {
         headers: { "Content-Type": "application/json" }
     };
     client.get(api_server + "/v1/model", args, function (data, response) {
         console.log(data.result);
-        //console.log('###################################################');
         console.log(data);
     }).on('error', function (err) {
         console.log(err);
-        //console.log('');
-        //console.log('something went wrong on the request', err.request.options);
-        //console.log('errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr');
     });
 }
 
 //***************** Main functions
 function charaFormatData(data) {
-    var char = { "name": data.ch_name, "description": data.description, "personality": data.personality, "first_mes": data.first_mes, "avatar": 'none', "chat": data.ch_name + ' - ' + humanizedISO8601DateTime(), "mes_example": data.mes_example, "scenario": data.scenario, "create_date": humanizedISO8601DateTime(), "talkativeness": data.talkativeness };
+    var char = { "name": data.ch_name, "description": data.description, "personality": data.personality, "first_mes": data.first_mes, "avatar": 'none', "chat": data.ch_name + ' - ' + humanizedISO8601DateTime(), "mes_example": data.mes_example, "scenario": data.scenario, "create_date": humanizedISO8601DateTime(), "talkativeness": data.talkativeness, "fav": data.fav};
     return char;
 }
 app.post("/createcharacter", urlencodedParser, function (request, response) {
@@ -578,10 +657,6 @@ app.post("/createcharacter", urlencodedParser, function (request, response) {
         response.send("Error: A character with that name already exists.");
         //response.send({error: true});
     }
-    //console.log(request.body);
-    //response.send(request.body.ch_name);
-
-    //response.redirect("https://metanit.com")
 });
 
 
@@ -596,10 +671,8 @@ app.post("/editcharacter", urlencodedParser, async function (request, response) 
     var char = charaFormatData(request.body);//{"name": request.body.ch_name, "description": request.body.description, "personality": request.body.personality, "first_mes": request.body.first_mes, "avatar": request.body.avatar_url, "chat": request.body.chat, "last_mes": request.body.last_mes, "mes_example": ''};
     char.chat = request.body.chat;
     char.create_date = request.body.create_date;
-
     char = JSON.stringify(char);
     let target_img = (request.body.avatar_url).replace('.png', '');
-
     try {
         if (!filedata) {
 
@@ -675,11 +748,13 @@ async function charaWrite(img_url, data, target_img, response = undefined, mes =
 
         fs.writeFileSync(charactersPath + target_img + '.png', new Buffer.from(encode(chunks)));
         if (response !== undefined) response.send(mes);
+        return true;
 
 
     } catch (err) {
         console.log(err);
-        if (response !== undefined) response.send(err);
+        if (response !== undefined) response.status(500).send(err);
+        return false;
     }
 }
 
@@ -744,13 +819,13 @@ app.post("/getcharacters", jsonParser, function (request, response) {
                     const charStat = fs.statSync(path.join(charactersPath, item));
                     characters[i]['date_added'] = charStat.birthtimeMs;
                     const char_dir = path.join(chatsPath, item.replace('.png', ''));
-    
+
                     let chat_size = 0;
                     let date_last_chat = 0;
-    
-                    if (fs.existsSync(char_dir)) { 
+
+                    if (fs.existsSync(char_dir)) {
                         const chats = fs.readdirSync(char_dir);
-    
+
                         if (Array.isArray(chats) && chats.length) {
                             for (const chat of chats) {
                                 const chatStat = fs.statSync(path.join(char_dir, chat));
@@ -759,7 +834,7 @@ app.post("/getcharacters", jsonParser, function (request, response) {
                             }
                         }
                     }
-    
+
                     characters[i]['date_last_chat'] = date_last_chat;
                     characters[i]['chat_size'] = chat_size;
                 }
@@ -768,7 +843,7 @@ app.post("/getcharacters", jsonParser, function (request, response) {
                     characters[i]['date_last_chat'] = 0;
                     characters[i]['chat_size'] = 0;
                 }
-                
+
                 i++;
             } catch (error) {
                 console.log(`Could not read character: ${item}`);
@@ -782,11 +857,6 @@ app.post("/getcharacters", jsonParser, function (request, response) {
         //console.log(characters);
         response.send(JSON.stringify(characters));
     });
-    //var directories = getDirectories("public/characters");
-    //console.log(directories[0]);
-    //characters = {};
-    //character_i = 0;
-    //getCharacterFile(directories, response,0);
 
 });
 app.post("/getbackgrounds", jsonParser, function (request, response) {
@@ -808,11 +878,6 @@ app.post("/getuseravatars", jsonParser, function (request, response) {
 
 });
 app.post("/setbackground", jsonParser, function (request, response) {
-    //console.log(request.data);
-    //console.log(request.body.bg);
-    //const data = request.body;
-    //console.log(request);
-    //console.log(1);
     var bg = "#bg1 {background-image: url(../backgrounds/" + request.body.bg + ");}";
     fs.writeFile('public/css/bg_load.css', bg, 'utf8', function (err) {
         if (err) {
@@ -906,8 +971,6 @@ app.post("/downloadbackground", urlencodedParser, function (request, response) {
 });
 
 app.post("/savesettings", jsonParser, function (request, response) {
-
-
     fs.writeFile('public/settings.json', JSON.stringify(request.body), 'utf8', function (err) {
         if (err) {
             response.send(err);
@@ -918,8 +981,8 @@ app.post("/savesettings", jsonParser, function (request, response) {
             response.send({ result: "ok" });
         }
     });
-
 });
+
 app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's code
     const koboldai_settings = [];
     const koboldai_setting_names = [];
@@ -929,6 +992,7 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
     const openai_setting_names = [];
     const textgenerationwebui_presets = [];
     const textgenerationwebui_preset_names = [];
+    const themes = [];
     const settings = fs.readFileSync('public/settings.json', 'utf8', (err, data) => {
         if (err) return response.sendStatus(500);
 
@@ -1031,6 +1095,30 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         textgenerationwebui_preset_names.push(item.replace(/\.[^/.]+$/, ''));
     });
 
+    // Theme files
+    const themeFiles = fs
+        .readdirSync(directories.themes)
+        .filter(x => path.parse(x).ext == '.json')
+        .sort();
+
+    themeFiles.forEach(item => {
+        const file = fs.readFileSync(
+            path.join(directories.themes, item),
+            'utf-8',
+            (err, data) => {
+                if (err) return response.sendStatus(500);
+                return data;
+            }
+        );
+
+        try {
+            themes.push(json5.parse(file));
+        }
+        catch {
+            // skip
+        }
+    })
+
     response.send({
         settings,
         koboldai_settings,
@@ -1042,6 +1130,7 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         openai_setting_names,
         textgenerationwebui_presets,
         textgenerationwebui_preset_names,
+        themes,
         enable_extensions: enableExtensions,
     });
 });
@@ -1074,6 +1163,17 @@ app.post('/deleteworldinfo', jsonParser, (request, response) => {
     return response.sendStatus(200);
 });
 
+app.post('/savetheme', jsonParser, (request, response) => {
+    if (!request.body || !request.body.name) {
+        return response.sendStatus(400);
+    }
+
+    const filename = path.join(directories.themes, sanitize(request.body.name) + '.json');
+    fs.writeFileSync(filename, JSON.stringify(request.body), 'utf8');
+
+    return response.sendStatus(200);
+});
+
 function readWorldInfoFile(worldInfoName) {
     if (!worldInfoName) {
         return { entries: {} };
@@ -1091,34 +1191,6 @@ function readWorldInfoFile(worldInfoName) {
     return worldInfo;
 }
 
-function getCharacterFile(directories, response, i) { //old need del
-    if (directories.length > i) {
-
-        fs.stat(charactersPath + directories[i] + '/' + directories[i] + ".json", function (err, stat) {
-            if (err == null) {
-                fs.readFile(charactersPath + directories[i] + '/' + directories[i] + ".json", 'utf8', (err, data) => {
-                    if (err) {
-                        console.error(err);
-                        return;
-                    }
-                    //console.log(data);
-
-                    characters[character_i] = {};
-                    characters[character_i] = data;
-                    i++;
-                    character_i++;
-                    getCharacterFile(directories, response, i);
-                });
-            } else {
-                i++;
-                getCharacterFile(directories, response, i);
-            }
-        });
-
-    } else {
-        response.send(JSON.stringify(characters));
-    }
-}
 
 function getImages(path) {
     return fs
@@ -1128,17 +1200,6 @@ function getImages(path) {
             return type && type.startsWith('image/');
         })
         .sort(Intl.Collator().compare);
-}
-
-function getKoboldSettingFiles(path) {
-    return fs.readdirSync(path).sort(function (a, b) {
-        return new Date(fs.statSync(path + '/' + a).mtime) - new Date(fs.statSync(path + '/' + b).mtime);
-    }).reverse();
-}
-function getDirectories(path) {
-    return fs.readdirSync(path).sort(function (a, b) {
-        return new Date(fs.statSync(path + '/' + a).mtime) - new Date(fs.statSync(path + '/' + b).mtime);
-    }).reverse();
 }
 
 //***********Novel.ai API 
@@ -1172,8 +1233,6 @@ app.post("/getstatus_novelai", jsonParser, function (request, response_getstatus
         response_getstatus_novel.send({ error: true });
     });
 });
-
-
 
 app.post("/generate_novelai", jsonParser, function (request, response_generate_novel = response) {
     if (!request.body) return response_generate_novel.sendStatus(400);
@@ -1403,11 +1462,11 @@ app.post("/exportcharacter", jsonParser, async function (request, response) {
                 let inputWebpPath = `./uploads/${Date.now()}_input.webp`;
                 let outputWebpPath = `./uploads/${Date.now()}_output.webp`;
                 let metadataPath = `./uploads/${Date.now()}_metadata.exif`;
-                let metadata = 
+                let metadata =
                 {
-                        "Exif": {
-                            [exif.ExifIFD.UserComment]: json,
-                        },
+                    "Exif": {
+                        [exif.ExifIFD.UserComment]: json,
+                    },
                 };
                 const exifString = exif.dump(metadata);
                 fs.writeFileSync(metadataPath, exifString, 'binary');
@@ -1434,17 +1493,12 @@ app.post("/exportcharacter", jsonParser, async function (request, response) {
 
 
 app.post("/importchat", urlencodedParser, function (request, response) {
-    //console.log(humanizedISO8601DateTime()+':/importchat begun');
     if (!request.body) return response.sendStatus(400);
 
     var format = request.body.file_type;
     let filedata = request.file;
     let avatar_url = (request.body.avatar_url).replace('.png', '');
     let ch_name = request.body.character_name;
-    //console.log(filedata.filename);
-    //var format = request.body.file_type;
-    //console.log(format);
-    //console.log(1);
     if (filedata) {
 
         if (format === 'json') {
@@ -1456,47 +1510,51 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                 }
 
                 const jsonData = json5.parse(data);
-                var new_chat = [];
                 if (jsonData.histories !== undefined) {
                     //console.log('/importchat confirms JSON histories are defined');
-                    let i = 0;
-                    new_chat[i] = {};
-                    new_chat[0]['user_name'] = 'You';
-                    new_chat[0]['character_name'] = ch_name;
-                    new_chat[0]['create_date'] = humanizedISO8601DateTime() //Date.now();
-                    i++;
-                    jsonData.histories.histories[0].msgs.forEach(function (item) {
-                        new_chat[i] = {};
-                        if (item.src.is_human == true) {
-                            new_chat[i]['name'] = 'You';
-                        } else {
-                            new_chat[i]['name'] = ch_name;
-                        }
-                        new_chat[i]['is_user'] = item.src.is_human;
-                        new_chat[i]['is_name'] = true;
-                        new_chat[i]['send_date'] = humanizedISO8601DateTime() //Date.now();
-                        new_chat[i]['mes'] = item.text;
-                        i++;
-                    });
-                    const chatJsonlData = new_chat.map(JSON.stringify).join('\n');
-                    //console.log('/importchat saving a file: '+ch_name+' - '+humanizedISO8601DateTime()+' imported.jsonl');
-                    fs.writeFile(chatsPath + avatar_url + '/' + ch_name + ' - ' + humanizedISO8601DateTime() + ' imported.jsonl', chatJsonlData, 'utf8', function (err) { //added ch_name and replaced Date.now() with humanizedISO8601DateTime
+                    const chat = {
+                        from(history) {
+                            return [
+                                {
+                                    user_name: 'You',
+                                    character_name: ch_name,
+                                    create_date: humanizedISO8601DateTime(),
 
-                        if (err) {
-                            response.send(err);
-                            return console.log(err);
-                            //response.send(err);
-                        } else {
-                            //response.redirect("/");
-                            response.send({ res: true });
+                                },
+                                ...history.msgs.map(
+                                    (message) => ({
+                                        name: message.src.is_human ? 'You' : ch_name,
+                                        is_user: message.src.is_human,
+                                        is_name: true,
+                                        send_date: humanizedISO8601DateTime(),
+                                        mes: message.text,
+                                    })
+                                )];
                         }
+                    }
+
+                    const newChats = [];
+                    (jsonData.histories.histories ?? []).forEach((history) => {
+                        newChats.push(chat.from(history));
                     });
 
+                    const errors = [];
+                    newChats.forEach(chat => fs.writeFile(
+                        chatsPath + avatar_url + '/' + ch_name + ' - ' + humanizedISO8601DateTime() + ' imported.jsonl',
+                        chat.map(JSON.stringify).join('\n'),
+                        'utf8',
+                        (err) => err ?? errors.push(err)
+                    )
+                    );
+
+                    if (0 < errors.length) {
+                        response.send('Errors occurred while writing character files. Errors: ' + JSON.stringify(errors));
+                    }
+
+                    response.send({ res: true });
                 } else {
                     response.send({ error: true });
-                    return;
                 }
-
             });
         }
         if (format === 'jsonl') {
@@ -1639,6 +1697,7 @@ app.post('/creategroup', jsonParser, (request, response) => {
         allow_self_responses: !!request.body.allow_self_responses,
         activation_strategy: request.body.activation_strategy ?? 0,
         chat_metadata: request.body.chat_metadata ?? {},
+        fav: request.body.fav,
     };
     const pathToFile = path.join(directories.groups, `${id}.json`);
     const fileData = JSON.stringify(chatMetadata);
@@ -1655,7 +1714,6 @@ app.post('/editgroup', jsonParser, (request, response) => {
     if (!request.body || !request.body.id) {
         return response.sendStatus(400);
     }
-
     const id = request.body.id;
     const pathToFile = path.join(directories.groups, `${id}.json`);
     const fileData = JSON.stringify(request.body);
@@ -1724,8 +1782,8 @@ app.post('/deletegroup', jsonParser, async (request, response) => {
 
 const POE_DEFAULT_BOT = 'a2';
 
-async function getPoeClient(token) {
-    let client = new poe.Client();
+async function getPoeClient(token, useCache = false) {
+    let client = new poe.Client(false, useCache);
     await client.init(token);
     return client;
 }
@@ -1757,7 +1815,7 @@ app.post('/purge_poe', jsonParser, async (request, response) => {
     const count = request.body.count ?? -1;
 
     try {
-        const client = await getPoeClient(token);
+        const client = await getPoeClient(token, true);
         await client.purge_conversation(bot, count);
         client.disconnect_ws();
 
@@ -1776,23 +1834,104 @@ app.post('/generate_poe', jsonParser, async (request, response) => {
     const token = request.body.token;
     const prompt = request.body.prompt;
     const bot = request.body.bot ?? POE_DEFAULT_BOT;
+    const streaming = request.body.streaming ?? false;
+
+    let client;
 
     try {
-        const client = await getPoeClient(token);
-
-        let reply;
-        for await (const mes of client.send_message(bot, prompt)) {
-            reply = mes.text;
-        }
-
-        console.log(reply);
-
-        client.disconnect_ws();
-
-        return response.send({ 'reply': reply });
+        client = await getPoeClient(token, true);
     }
-    catch {
+    catch (error) {
+        console.error(error);
         return response.sendStatus(500);
+    }
+
+    if (streaming) {
+        let isStreamingStopped = false;
+        request.socket.on('close', function () {
+            isStreamingStopped = true;
+            client.abortController.abort();
+        });
+
+        try {
+            response.writeHead(200, {
+                'Content-Type': 'text/plain;charset=utf-8',
+                'Transfer-Encoding': 'chunked',
+                'Cache-Control': 'no-transform',
+            });
+
+            let reply = '';
+            for await (const mes of client.send_message(bot, prompt)) {
+                if (isStreamingStopped) {
+                    console.error('Streaming stopped by user. Closing websocket...');
+                    break;
+                }
+
+                let newText = mes.text.substring(reply.length);
+                reply = mes.text;
+                response.write(newText);
+            }
+            console.log(reply);
+        }
+        catch (err) {
+            console.error(err);
+        }
+        finally {
+            client.disconnect_ws();
+            return response.end();
+        }
+    }
+    else {
+        try {
+            let reply;
+            for await (const mes of client.send_message(bot, prompt)) {
+                reply = mes.text;
+            }
+            console.log(reply);
+            client.disconnect_ws();
+            return response.send({ 'reply': reply });
+        }
+        catch {
+            client.disconnect_ws();
+            return response.sendStatus(500);
+        }
+    }
+});
+
+app.get('/discover_extensions', jsonParser, function (_, response) {
+    const extensions = fs
+        .readdirSync(directories.extensions)
+        .filter(f => fs.statSync(path.join(directories.extensions, f)).isDirectory());
+
+    return response.send(extensions);
+});
+
+app.get('/get_sprites', jsonParser, function (request, response) {
+    const name = request.query.name;
+    const spritesPath = path.join(directories.characters, name);
+    let sprites = [];
+
+    try {
+        if (fs.existsSync(spritesPath) && fs.statSync(spritesPath).isDirectory()) {
+            sprites = fs.readdirSync(spritesPath)
+                .filter(file => {
+                    const mimeType = mime.lookup(file);
+                    return mimeType && mimeType.startsWith('image/');
+                })
+                .map((file) => {
+                    const pathToSprite = path.join(spritesPath, file);
+                    return {
+                        label: path.parse(pathToSprite).name.toLowerCase(),
+                        path: `/characters/${name}/${file}`,
+                    };
+                });
+        }
+    }
+    catch (err) {
+        console.log(err);
+    }
+    finally {
+        return response.send(sprites);
     }
 });
 
@@ -1887,8 +2026,14 @@ async function generateThumbnail(type, file) {
     const imageSizes = { 'bg': [160, 90], 'avatar': [96, 144] };
     const mySize = imageSizes[type];
 
-    const image = await jimp.read(pathToOriginalFile);
-    await image.cover(mySize[0], mySize[1]).quality(95).writeAsync(pathToCachedFile);
+    try {
+        const image = await jimp.read(pathToOriginalFile);
+        const buffer = await image.cover(mySize[0], mySize[1]).quality(95).getBufferAsync(mime.lookup('jpg'));
+        fs.writeFileSync(pathToCachedFile, buffer);
+    }
+    catch (err) {
+        return null;
+    }
 
     return pathToCachedFile;
 }
@@ -1949,9 +2094,44 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
     });
 });
 
+// Shamelessly stolen from Agnai
+app.post("/openai_usage", jsonParser, async function (_, response) {
+    if (!request.body) return response.sendStatus(400);
+    const key = request.body.key;
+    const api_url = new URL(request.body.reverse_proxy || api_openai).toString();
+
+    const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+    };
+
+    const date = new Date();
+    date.setDate(1);
+    const start_date = date.toISOString().slice(0, 10);
+
+    date.setMonth(date.getMonth() + 1);
+    const end_date = date.toISOString().slice(0, 10);
+
+    try {
+        const res = await getAsync(
+            `${api_url}/dashboard/billing/usage?start_date=${start_date}&end_date=${end_date}`,
+            { headers },
+        );
+        return response.send(res);
+    }
+    catch {
+        return response.sendStatus(400);
+    }
+});
+
 app.post("/generate_openai", jsonParser, function (request, response_generate_openai) {
     if (!request.body) return response_generate_openai.sendStatus(400);
     const api_url = new URL(request.body.reverse_proxy || api_openai).toString();
+
+    const controller = new AbortController();
+    request.socket.on('close', function () {
+        controller.abort();
+    });
 
     console.log(request.body);
     const config = {
@@ -1971,7 +2151,8 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
             "frequency_penalty": request.body.frequency_penalty,
             "stop": request.body.stop,
             "logit_bias": request.body.logit_bias
-        }
+        },
+        signal: controller.signal,
     };
 
     if (request.body.stream)
@@ -1988,8 +2169,9 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
                         response_generate_openai.end();
                     });
                 } else {
-                    console.log(response.data);
                     response_generate_openai.send(response.data);
+                    console.log(response.data);
+                    console.log(response.data?.choices[0]?.message);
                 }
             } else if (response.status == 400) {
                 console.log('Validation error');
@@ -2028,19 +2210,23 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
 app.post("/tokenize_openai", jsonParser, function (request, response_tokenize_openai = response) {
     if (!request.body) return response_tokenize_openai.sendStatus(400);
 
+    const tokensPerName = request.query.model.includes('gpt-4') ? 1 : -1;
+    const tokensPerMessage = request.query.model.includes('gpt-4') ? 3 : 4;
+    const tokensPadding = 3;
+
     const tokenizer = tiktoken.encoding_for_model(request.query.model);
 
     let num_tokens = 0;
     for (const msg of request.body) {
-        num_tokens += 4;
+        num_tokens += tokensPerMessage;
         for (const [key, value] of Object.entries(msg)) {
             num_tokens += tokenizer.encode(value).length;
             if (key == "name") {
-                num_tokens += -1;
+                num_tokens += tokensPerName;
             }
         }
     }
-    num_tokens += 2;
+    num_tokens += tokensPadding;
 
     tokenizer.free();
 
@@ -2105,23 +2291,56 @@ function getAsync(url, args) {
 }
 // ** END **
 
-app.listen(server_port, (listen ? '0.0.0.0' : '127.0.0.1'), async function () {
+const tavernUrl = new URL(
+    (cliArguments.ssl ? 'https://' : 'http://') +
+    (listen ? '0.0.0.0' : '127.0.0.1') +
+    (':' + server_port)
+);
+
+const autorunUrl = new URL(
+    (cliArguments.ssl ? 'https://' : 'http://') +
+    ('127.0.0.1') +
+    (':' + server_port)
+);
+
+const setupTasks = async function () {
     ensurePublicDirectoriesExist();
     await ensureThumbnailCache();
 
     // Colab users could run the embedded tool
-    if (!is_colab) {
-        await convertWebp();
-    }
+    if (!is_colab) await convertWebp();
 
     console.log('Launching...');
-    if (autorun) open('http://127.0.0.1:' + server_port);
-    console.log('TavernAI started: http://127.0.0.1:' + server_port);
+  
+    if (autorun) open(autorunUrl.toString());
+    console.log('SillyTavern is listening on: ' + tavernUrl);
+    if (listen &&
+        !config.whitelistMode &&
+        !config.basicAuthMode)
+        console.log('Your SillyTavern is currently open to the public. To increase security, consider enabling whitelisting or basic authentication.')
+
     if (fs.existsSync('public/characters/update.txt') && !is_colab) {
         convertStage1();
     }
+}
 
-});
+if (true === cliArguments.ssl)
+    https.createServer(
+        {
+            cert: fs.readFileSync(cliArguments.certPath),
+            key: fs.readFileSync(cliArguments.keyPath)
+        }, app)
+        .listen(
+            tavernUrl.port,
+            tavernUrl.hostname,
+            setupTasks
+        );
+else
+    http.createServer(app).listen(
+        tavernUrl.port,
+        tavernUrl.hostname,
+        setupTasks
+    );
 
 //#####################CONVERTING IN NEW FORMAT########################
 
@@ -2330,7 +2549,12 @@ async function convertWebp() {
             await webp.dwebp(source, dest, "-o");
 
             console.log(`Write... ${dest}`);
-            await charaWrite(dest, data, path.parse(dest).name);
+            const success = await charaWrite(dest, data, path.parse(dest).name);
+
+            if (!success) {
+                console.log(`Failure on ${source} -> ${dest}`);
+                continue;
+            }
 
             console.log(`Remove... ${source}`);
             fs.rmSync(source);
