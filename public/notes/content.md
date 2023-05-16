@@ -109,7 +109,7 @@ For example:
 
 ### Examples of dialogue
 
-Describes how the character speaks. Before each example, you need to add the <START> tag.
+Describes how the character speaks. Before each example, you need to add the &lt;START&gt; tag.
 Use {{char}} instead of the character name.
 Use {{user}} instead of the user name.
 
@@ -135,8 +135,8 @@ Circumstances and context of the dialogue.
 
 _A list of tags that are replaced when sending to generate:_
 
-1. {{user}} and <USER> are replaced by the User's Name  
-2. {{char}} and <BOT> are replaced by the Character's Name
+1. {{user}} and &lt;USER&gt; are replaced by the User's Name  
+2. {{char}} and &lt;BOT&gt; are replaced by the Character's Name
 
 ### Favorite Character
 
@@ -393,26 +393,59 @@ _Lost API keys can't be restored! Make sure to keep it safe!_
 
 ## Anchors
 
-Anchors are used to increase the length of messages.
-There are two types of anchors: _Character Anchor_ and _Style Anchor_.
+This feature is considered obsolete and has been removed.
 
-_Character Anchor_ - affects the character played by the AI by motivating it to write longer messages.
+The use of the Author's Note extension is now a preferred way to add prompt injections of variable depth.
 
-Looks like: `[Elaborate speaker]`
+## Instruct Mode
 
-_Style Anchor_ - affects the entire AI model, motivating the AI to write longer messages even when it is not acting as the character.
+Instruct Mode allows you to adjust the prompting for instruction-following models, such as Alpaca, Metharme, WizardLM, etc.
 
-Looks like: `[Writing style: very long messages]`
+**This is not supported for OpenAI API.**
 
-***
+### Instruct Mode Settings
 
-Anchors Order sets the location of anchors in the prompt, the first anchor in the order is much further back in the context and thus has less influence than second.
+#### System Prompt
 
-The second anchor is only turned on after 8-12 messages, because when the chat still only has a few messages, the first anchor creates enough effect on its own.
+Added to the beginning of each prompt. Should define the instructions for the model to follow.
 
-Sometimes an AI model may not perceive anchors correctly or the AI model already generates sufficiently long messages. For these cases, you can disable the anchors by unchecking their respective boxes.
+For example:
 
-_When using Pygmalion models these anchors are automatically disabled, since Pygmalion already generates long enough messages._
+```
+Write one reply in internet RP style for {{char}}. Be verbose and creative.
+```
+
+#### Presets
+
+Provides ready-made presets with prompts and sequences for some well-known instruct models.
+
+*Changing a preset resets your system prompt to default!*
+
+#### Input Sequence
+
+Text added before the user's input.
+
+#### Output Sequence
+
+Text added before the character's reply.
+
+#### System Sequence
+
+Text added before the system prompt.
+
+#### Stop Sequence
+
+Text that denotes the end of the reply. Will be trimmed from the output text.
+
+#### Include Names
+
+If enabled, prepend character and user names to chat history logs after inserting the sequences.
+
+*Always enabled for group chats!*
+
+#### Wrap Sequences with Newline
+
+Each sequence text will be wrapped with newline characters when inserted to the prompt. Required for Alpaca and its derivatives.
 
 ## Chat import
 
@@ -544,6 +577,8 @@ Characters are drafted based on the order they are presented in group members li
 
 ## Multigen
 
+*This feature provides a pseudo-streaming functionality which conflicts with token streaming. When Multigen is enabled and generation API supports streaming, only Multigen streaming will be used.*
+
 SillyTavern tries to create faster and longer responses by chaining the generation using smaller batches.
 
 ### Default settings:
@@ -562,8 +597,9 @@ Next batches = 30 tokens
 
 1. Generated enough text.
 2. Character starts speaking for You.
-3. <|endoftext|> token reached.
+3. &lt;|endoftext|&gt; token reached.
 4. No text generated.
+5. Stop sequence generated. (Instruct mode only) 
 
 ## User Settings 
 

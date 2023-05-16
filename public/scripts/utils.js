@@ -162,3 +162,57 @@ export function restoreCaretPosition(element, position) {
     selection.removeAllRanges();
     selection.addRange(range);
 }
+
+export async function resetScrollHeight(element) {
+    $(element).css('height', '0px');
+    $(element).css('height', $(element).prop('scrollHeight') + 3 + 'px');
+}
+
+export async function initScrollHeight(element) {
+    await delay(1);
+
+    const curHeight = Number($(element).css("height").replace('px', ''));
+    const curScrollHeight = Number($(element).prop("scrollHeight"));
+    const diff = curScrollHeight - curHeight;
+
+    if (diff < 3) { return } //happens when the div isn't loaded yet
+
+    const newHeight = curHeight + diff + 3; //the +3 here is to account for padding/line-height on text inputs
+    //console.log(`init height to ${newHeight}`);
+    $(element).css("height", "");
+    $(element).css("height", `${newHeight}px`);
+    //resetScrollHeight(element);
+}
+
+export function sortByCssOrder(a, b) {
+    const _a = Number($(a).css('order'));
+    const _b = Number($(b).css('order'));
+    return _a - _b;
+}
+
+export function end_trim_to_sentence(input, include_newline = false) {
+    // inspired from https://github.com/kaihordewebui/kaihordewebui.github.io/blob/06b95e6b7720eb85177fbaf1a7f52955d7cdbc02/index.html#L4853-L4867
+
+    const punctuation = new Set(['.', '!', '?', '*', '"', ')', '}', '`', ']', '$']); // extend this as you see fit
+    let last = -1;
+
+    for (let i = input.length - 1; i >= 0; i--) {
+        const char = input[i];
+
+        if (punctuation.has(char)) {
+            last = i;
+            break;
+        }
+
+        if (include_newline && char === '\n') {
+            last = i;
+            break;
+        }
+    }
+
+    if (last === -1) {
+        return input.trimEnd();
+    }
+
+    return input.substring(0, last + 1).trimEnd();
+}

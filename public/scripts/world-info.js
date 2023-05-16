@@ -1,5 +1,5 @@
 import { saveSettings, callPopup, substituteParams, getTokenCount, getRequestHeaders } from "../script.js";
-import { download, debounce, delay } from "./utils.js";
+import { download, debounce, delay, initScrollHeight, resetScrollHeight } from "./utils.js";
 
 export {
     world_info,
@@ -188,6 +188,7 @@ function appendWorldEntry(entry) {
             .filter((x) => x);
         saveWorldInfo();
     });
+
     keySecondaryInput.val(entry.keysecondary.join(",")).trigger("input");
     initScrollHeight(keySecondaryInput);
 
@@ -234,7 +235,20 @@ function appendWorldEntry(entry) {
         const keysecondary = $(this)
             .closest(".world_entry")
             .find(".keysecondary");
+
+        const keysecondarytextpole = $(this)
+            .closest(".world_entry")
+            .find(".keysecondarytextpole");
+
+        const keyprimarytextpole = $(this)
+            .closest(".world_entry")
+            .find(".keyprimarytextpole");
+
+        const keyprimaryHeight = keyprimarytextpole.outerHeight();
+        keysecondarytextpole.css('height', keyprimaryHeight + 'px');
+
         value ? keysecondary.show() : keysecondary.hide();
+
     });
     selectiveInput.prop("checked", entry.selective).trigger("input");
     selectiveInput.siblings(".checkbox_fancy").click(function () {
@@ -297,7 +311,7 @@ function appendWorldEntry(entry) {
         const value = $(this).prop("checked");
         world_info_data.entries[uid].disable = value;
         saveWorldInfo();
-        console.log(`WI #${entry.uid} disabled? ${world_info_data.entries[uid].disable}`);
+        //console.log(`WI #${entry.uid} disabled? ${world_info_data.entries[uid].disable}`);
     });
     disableInput.prop("checked", entry.disable).trigger("input");
     disableInput.siblings(".checkbox_fancy").click(function () {
@@ -317,20 +331,6 @@ function appendWorldEntry(entry) {
     template.appendTo("#world_popup_entries_list");
 
     return template;
-}
-
-async function resetScrollHeight(element) {
-    element.style.height = '';
-    element.style.height = (element.scrollHeight) + 3 + 'px';
-}
-
-async function initScrollHeight(element) {
-    await delay(1);
-    const height = Number($(element).prop("scrollHeight") + 3);
-    console.log(height);
-    //console.log(element.style.height);
-    $(element).css("height", "");
-    $(element).css("height", `${height}px`);
 }
 
 async function deleteWorldInfoEntry(uid) {
@@ -593,7 +593,8 @@ $(document).ready(() => {
             await loadWorldInfoData();
         }
 
-        hideWorldEditor();
+        if (selectedWorld === "None") { hideWorldEditor(); }
+        if (is_world_edit_open && selectedWorld !== "None") { showWorldEditor() };
         saveSettingsDebounced();
     });
 

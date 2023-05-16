@@ -1,43 +1,38 @@
 # SillyTavern
+
 ## Based on a fork of TavernAI 1.2.8
-### Brought to you by Cohee and RossAscends
+
+### Brought to you by Cohee, RossAscends and the SillyTavern community
 
 NOTE: We have added [a FAQ](faq.md) to answer most of your questions and help you get started.
 
 ### What is SillyTavern or TavernAI?
+
 Tavern is a user interface you can install on your computer (and Android phones) that allows you to interact with text generation AIs and chat/roleplay with characters you or the community create.
 
 SillyTavern is a fork of TavernAI 1.2.8 which is under more active development and has added many major features. At this point, they can be thought of as completely independent programs.
 
 ### What do I need other than Tavern?
+
 On its own Tavern is useless, as it's just a user interface. You have to have access to an AI system backend that can act as the roleplay character. There are various supported backends: OpenAPI API (GPT), KoboldAI (either running locally or on Google Colab), and more. You can read more about this in [the FAQ](faq.md).
 
 ### Do I need a powerful PC to run Tavern?
+
 Since Tavern is only a user interface, it has tiny hardware requirements, it will run on anything. It's the AI system backend that needs to be powerful.
-
-### I want to try self-hosted easily. Got a Google Colab?
-
-Try on Colab (runs KoboldAI backend and TavernAI Extras server alongside):  <a target="_blank" href="https://colab.research.google.com/github/Cohee1207/SillyTavern/blob/main/colab/GPU.ipynb">
-  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
-
-https://colab.research.google.com/github/Cohee1207/SillyTavern/blob/main/colab/GPU.ipynb
-
-Run on Repl.it:  
-[![Run on Repl.it](https://replit.com/badge?caption=Run+On+Repl.it)](https://replit.com/new/github/Cohee1207/SillyTavern)
-
 
 ## Mobile support
 
+> **Note**
+
 > **This fork can be run natively on Android phones using Termux. Please refer to this guide by ArroganceComplex#2659:**
 
-https://rentry.org/STAI-Termux
+<https://rentry.org/STAI-Termux>
 
 **.webp character cards import/export is not supported in Termux. Use either JSON or PNG formats instead.**
 
 ## Questions or suggestions?
 
-### We now have a community Discord server!
+### We now have a community Discord server
 
 Get support, share favorite characters and prompts:
 
@@ -46,11 +41,13 @@ Get support, share favorite characters and prompts:
 ***
 
 Get in touch with the developers directly:
+
 * Discord: Cohee#1207 or RossAscends#1779
 * Reddit: /u/RossAscends or /u/sillylossy
 * [Post a GitHub issue](https://github.com/Cohee1207/SillyTavern/issues)
 
 ## This version includes
+
 * A heavily modified TavernAI 1.2.8 (more than 50% of code rewritten or optimized)
 * Swipes
 * Group chats: multi-bot rooms for characters to talk to you or each other
@@ -64,12 +61,13 @@ Get in touch with the developers directly:
 * Prompt generation formatting tweaking
 * webp character card interoperability (PNG is still an internal format)
 * Extensibility support via [SillyLossy's TAI-extras](https://github.com/Cohee1207/TavernAI-extras) plugins
-    * Author's Note / Character Bias
-    * Character emotional expressions
-    * Auto-Summary of the chat history
-    * Sending images to chat, and the AI interpreting the content.
+  * Author's Note / Character Bias
+  * Character emotional expressions
+  * Auto-Summary of the chat history
+  * Sending images to chat, and the AI interpreting the content.
 
 ## UI Extensions 🚀
+
 | Name             | Description                      | Required <a href="https://github.com/Cohee1207/TavernAI-extras#modules" target="_blank">Extra Modules</a> | Screenshot |
 | ---------------- | ---------------------------------| ---------------------------- | ---------- |
 | Image Captioning | Send a cute picture to your bot!<br><br>Picture select option will appear beside the "Message send" button. | `caption`                    | <img src="https://user-images.githubusercontent.com/18619528/224161576-ddfc51cd-995e-44ec-bf2d-d2477d603f0c.png" style="max-width:200px" />  |
@@ -88,7 +86,7 @@ Get in touch with the developers directly:
   * Left = swipe left
   * Right = swipe right (NOTE: swipe hotkeys are disabled when chatbar has something typed into it)
   * Ctrl+Left = view locally stored variables (in the browser console window)
-  * Enter (with chat bar selected) = send your message to AI 
+  * Enter (with chat bar selected) = send your message to AI
   * Ctrl+Enter = Regenerate the last AI response
 
 * User Name Changes and Character Deletion no longer force the page to refresh.
@@ -107,18 +105,45 @@ Get in touch with the developers directly:
 * Nav panel status of open or closed will also be saved across sessions.
 
 * Customizable chat UI:
-    * Play a sound when a new message arrives
-    * Switch between round or rectangle avatar styles
-    * Have a wider chat window on the desktop
-    * Optional semi-transparent glass-like panels
-    * Customizable page colors for 'main text', 'quoted text' 'italics text'.
-    * Customizable UI background color and blur amount
+  * Play a sound when a new message arrives
+  * Switch between round or rectangle avatar styles
+  * Have a wider chat window on the desktop
+  * Optional semi-transparent glass-like panels
+  * Customizable page colors for 'main text', 'quoted text' 'italics text'.
+  * Customizable UI background color and blur amount
 
 ## Installation
 
-*NOTE: This branch is intended for local install purposes, and has not been thoroughly tested on a colab or other cloud notebook service.*
+*NOTE: This software is intended for local install purposes, and has not been thoroughly tested on a colab or other cloud notebook service.*
+
+> **Warning**
+
+> DO NOT INSTALL INTO ANY WINDOWS CONTROLLED FOLDER (Program Files, System32, etc).
+
+> DO NOT RUN START.BAT WITH ADMIN PERMISSIONS
 
 ### Windows
+
+Installing via Git (recommended for easy updating)
+
+Easy to follow guide with pretty pictures:
+<https://docs.alpindale.dev/pygmalion-extras/sillytavern/#windows-installation>
+
+  1. Install [NodeJS](https://nodejs.org/en) (latest LTS version is recommended)
+  2. Install [GitHub Desktop](https://central.github.com/deployments/desktop/desktop/latest/win32)
+  3. Open Windows Explorer (`Win+E`)
+  4. Browse to or Create a folder that is not controlled or monitored by Windows. (ex: C:\MySpecialFolder\)
+  5. Open a Command Prompt inside that folder by clicking in the 'Address Bar' at the top, typing `cmd`, and pressing Enter.
+  6. Once the black box (Command Prompt) pops up, type ONE of the following into it and press Enter:
+  
+  * for Main Branch: `git clone <https://github.com/Cohee1207/SillyTavern> -b main`
+  * for Dev Branch: `git clone <https://github.com/Cohee1207/SillyTavern> -b dev`
+  
+  7. Once everything is cloned, double click `Start.bat` to make NodeJS install its requirements.
+  8. The server will then start, and SillyTavern will popup in your browser.
+
+Installing via zip download
+
   1. install [NodeJS](https://nodejs.org/en) (latest LTS version is recommended)
   2. download the zip from this GitHub repo
   3. unzip it into a folder of your choice
@@ -126,46 +151,76 @@ Get in touch with the developers directly:
   5. Once the server has prepared everything for you, it will open a tab in your browser.
 
 ### Linux
+
   1. Run the `start.sh` script.
   2. Enjoy.
 
+## API keys management
+
+SillyTavern saves your API keys to a `secrets.json` file in the server directory.
+
+By default they will not be exposed to a frontend after you enter them and reload the page.
+
+In order to enable viewing your keys by clicking a button in the API block:
+
+1. Set the value of `allowKeysExposure` to `true` in `config.conf` file.
+2. Restart the SillyTavern server.
+
 ## Remote connections
 
-Most often this is for people who want to use SillyTavern on their mobile phones while at home.
-If you want to enable other devices to connect to your TAI server, open 'config.conf' in a text editor, and change: 
+Most often this is for people who want to use SillyTavern on their mobile phones while their PC runs the ST server on the same wifi network.
 
-```
-const whitelistMode = true;
-```
-to 
-```
-const whitelistMode = false;
-```
-Save the file. 
-Restart your TAI server. 
+However, it can be used to allow remote connections from anywhere as well.
 
-You will now be able to connect from other devices.
+**IMPORTANT: SillyTavern is a single-user program, so anyone who logs in will be able to see all characters and chats, and be able to change any settings inside the UI.**
 
-### Managing whitelisted IPs
+### 1. Managing whitelisted IPs
 
-You can add or remove whitelisted IPs by editing the `whitelist` array in `config.conf`. You can also provide a `whitelist.txt` file in the same directory as `config.conf` with one IP address per line like:
+* Create a new text file inside your SillyTavern base install folder called `whitelist.txt`.
+* Open the file in a text editor, add a list of IPs you want to be allowed to connect.
 
+*IP ranges are not accepted. Each IP must be listed individually like this:*
 ```txt
 192.168.0.1
 192.168.0.2
+192.168.0.3
+192.168.0.4
 ```
+* Save the `whitelist.txt` file.
+* Restart your TAI server.
 
-The `whitelist` array in `config.conf` will be ignored if `whitelist.txt` exists.
+Now devices which have the IP specified in the file will be able to connect.
 
-***Disclaimer: Anyone else who knows your IP address and TAI port number will be able to connect as well***
+*Note: `config.conf` also has a `whitelist` array, which you can use in the same way, but this array will be ignored if `whitelist.txt` exists.*
 
-To connect over wifi you'll need your PC's local wifi IP address 
-  - (For Windows: windows button > type 'cmd.exe' in the search bar> type 'ipconfig' in the console, hit Enter > "IPv4" listing)
-if you want other people on the internet to connect, check [here](https://whatismyipaddress.com/) for 'IPv4'
+### 2. Connecting to ST from a remote device
+
+After the whitelist has been setup, to connect over wifi you'll need the IP of the ST-hosting device. 
+
+If the ST-hosting device is on the same wifi network, you will point your remote device's browser to the ST-host's internal wifi IP: 
+
+* For Windows: windows button > type `cmd.exe` in the search bar > type `ipconfig` in the console, hit Enter > look for `IPv4` listing.
+
+If you (or someone else) wants to connect to your hosted ST while not being on the same network, you will need the public IP of your ST-hosting device.
+
+While using the ST-hosting device, access [this page](https://whatismyipaddress.com/) and look for for `IPv4`. This is what you would use to connect from the remote device.
+
+### Opening your ST to all IPs
+
+We do not reccomend doing this, but you can open `config.conf` and change `whitelist` to `false`.
+
+You must remove (or rename) `whitelist.txt` in the SillyTavern base install folder, if it exists. 
+
+This is usually an insecure practice, so we require you to set a username and password when you do this. 
+
+The username and password are set in `config.conf`.
+
+After restarting your ST server, any device will be able to connect to it, regardless of their IP as long as they know the username and password.
 
 ### Still Unable To Connect?
-- Create an inbound/outbound firewall rule for the port found in `config.conf`. Do NOT mistake this for portforwarding on your router, otherwise someone could find your chat logs and that's a big no-no.
-- Enable the Private Network profile type in Settings > Network and Internet > Ethernet. This is VERY important for Windows 11, otherwise you would be unable to connect even with the aforementioned firewall rules.
+
+* Create an inbound/outbound firewall rule for the port found in `config.conf`. Do NOT mistake this for portforwarding on your router, otherwise someone could find your chat logs and that's a big no-no.
+* Enable the Private Network profile type in Settings > Network and Internet > Ethernet. This is VERY important for Windows 11, otherwise you would be unable to connect even with the aforementioned firewall rules.
 
 ## Performance issues?
 
@@ -185,22 +240,37 @@ Try enabling the No Blur Effect (Fast UI) mode on the User settings panel.
 2. Send bug reports without providing any context
 3. Ask the questions that were already answered numerous times
 
+## Where can I find the old backgrounds?
+
+We're moving to 100% original content only policy, so old background images have been removed from this repository.
+
+You can find them archived here:
+
+<https://files.catbox.moe/1xevnc.zip>
+
 ## Screenshots
+
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/18619528/228649245-8061c60f-63dc-488e-9325-f151b7a3ec2d.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/18619528/228649856-fbdeef05-d727-4d5a-be80-266cbbc6b811.png">
 
 ## License and credits
+
+**This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.**
+
 * TAI Base by Humi: Unknown license
-* Cohee's TAI mod: Public domain
-* RossAscends' additions: Public domain
+* Cohee's modifications and derived code: AGPL v3
+* RossAscends' additions: AGPL v3
 * Portions of CncAnon's TavernAITurbo mod: Unknown license
-* Waifu mode inspired by the work of PepperTaco (https://github.com/peppertaco/Tavern/)
-* Thanks Pygmalion University for being awesome testers and suggesting cool features! 
+* Waifu mode inspired by the work of PepperTaco (<https://github.com/peppertaco/Tavern/>)
+* Thanks Pygmalion University for being awesome testers and suggesting cool features!
 * Thanks oobabooga for compiling presets for TextGen
-* poe-api client adapted from https://github.com/ading2210/poe-api (GPL v3)
-* GraphQL files for poe: https://github.com/muharamdani/poe (ISC License)
-* KoboldAI Presets from KAI Lite: https://lite.koboldai.net/ 
+* poe-api client adapted from <https://github.com/ading2210/poe-api> (GPL v3)
+* GraphQL files for poe: <https://github.com/muharamdani/poe> (ISC License)
+* KoboldAI Presets from KAI Lite: <https://lite.koboldai.net/>
 * Noto Sans font by Google (OFL license)
-* Icon theme by Font Awesome https://fontawesome.com (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)
+* Icon theme by Font Awesome <https://fontawesome.com> (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)
 * Linux startup script by AlpinDale
 * Thanks paniphons for providing a FAQ document
