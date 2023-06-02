@@ -6,18 +6,14 @@ const MODULE_NAME = 'caption';
 const UPDATE_INTERVAL = 1000;
 
 async function moduleWorker() {
-    const context = getContext();
-
-    context.onlineStatus === 'no_connection'
-        ? $('#send_picture').hide(200)
-        : $('#send_picture').show(200);
+    $('#send_picture').toggle(getContext().onlineStatus !== 'no_connection');
 }
 
 async function setImageIcon() {
     try {
-        const sendButton = document.getElementById('send_picture');
-        sendButton.classList.add('fa-image');
-        sendButton.classList.remove('fa-hourglass-half');
+        const sendButton = $('#send_picture .extensionsMenuExtensionButton');
+        sendButton.addClass('fa-image');
+        sendButton.removeClass('fa-hourglass-half');
     }
     catch (error) {
         console.log(error);
@@ -26,9 +22,9 @@ async function setImageIcon() {
 
 async function setSpinnerIcon() {
     try {
-        const sendButton = document.getElementById('send_picture');
-        sendButton.classList.remove('fa-image');
-        sendButton.classList.add('fa-hourglass-half');
+        const sendButton = $('#send_picture .extensionsMenuExtensionButton');
+        sendButton.removeClass('fa-image');
+        sendButton.addClass('fa-hourglass-half');
     }
     catch (error) {
         console.log(error);
@@ -92,15 +88,17 @@ async function onSelectImage(e) {
     }
 }
 
-$(document).ready(function () {
+jQuery(function () {
     function addSendPictureButton() {
-        const sendButton = document.createElement('div');
-        sendButton.id = 'send_picture';
-        sendButton.title = 'Send a picture to chat';
-        sendButton.classList.add('fa-solid');
+        const sendButton = $(`
+        <div id="send_picture" class="list-group-item flex-container flexGap5">
+            <div class="fa-solid fa-image extensionsMenuExtensionButton"></div>
+            Send a picture
+        </div>`);
+
+        $('#extensionsMenu').prepend(sendButton);
         $(sendButton).hide();
-        $(sendButton).on('click', () => $('#img_file').click());
-        $('#send_but_sheld').prepend(sendButton);
+        $(sendButton).on('click', () => $('#img_file').trigger('click'));
     }
     function addPictureSendForm() {
         const inputHtml = `<input id="img_file" type="file" accept="image/*">`;

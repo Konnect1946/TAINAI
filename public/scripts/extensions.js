@@ -1,17 +1,45 @@
-import { callPopup, saveSettings, saveSettingsDebounced } from "../script.js";
-import { isSubsetOf } from "./utils.js";
+import { callPopup, eventSource, event_types, saveSettings, saveSettingsDebounced } from "../script.js";
+import { isSubsetOf, debounce } from "./utils.js";
 export {
     getContext,
     getApiUrl,
     loadExtensionSettings,
+    runGenerationInterceptors,
     defaultRequestArgs,
     modules,
     extension_settings,
+    ModuleWorkerWrapper,
 };
 
 let extensionNames = [];
 let manifests = [];
 const defaultUrl = "http://localhost:5100";
+export const saveMetadataDebounced = debounce(async () => await getContext().saveMetadata(), 1000);
+
+// Disables parallel updates
+class ModuleWorkerWrapper {
+    constructor(callback) {
+        this.isBusy = false;
+        this.callback = callback;
+    }
+
+    // Called by the extension
+    async update() {
+        // Don't touch me I'm busy...
+        if (this.isBusy) {
+            return;
+        }
+
+        // I'm free. Let's update!
+        try {
+            this.isBusy = true;
+            await this.callback();
+        }
+        finally {
+            this.isBusy = false;
+        }
+    }
+}
 
 const extension_settings = {
     apiUrl: defaultUrl,
@@ -26,6 +54,9 @@ const extension_settings = {
     dice: {},
     tts: {},
     sd: {},
+    chromadb: {},
+    translate: {},
+    objective: {},
 };
 
 let modules = [];
@@ -78,19 +109,29 @@ async function disableExtension(name) {
 
 async function getManifests(names) {
     const obj = {};
-    for (const name of names) {
-        const response = await fetch(`/scripts/extensions/${name}/manifest.json`);
+    const promises = [];
 
-        if (response.ok) {
-            const json = await response.json();
-            obj[name] = json;
-        }
+    for (const name of names) {
+        const promise = new Promise((resolve, reject) => {
+            fetch(`/scripts/extensions/${name}/manifest.json`).then(async response => {
+                if (response.ok) {
+                    const json = await response.json();
+                    obj[name] = json;
+                    resolve();
+                }
+            }).catch(err => reject() && console.log('Could not load manifest.json for ' + name, err));
+        });
+
+        promises.push(promise);
     }
+
+    await Promise.allSettled(promises);
     return obj;
 }
 
 async function activateExtensions() {
     const extensions = Object.entries(manifests).sort((a, b) => a[1].loading_order - b[1].loading_order);
+    const promises = [];
 
     for (let entry of extensions) {
         const name = entry[0];
@@ -108,9 +149,11 @@ async function activateExtensions() {
                 const li = document.createElement('li');
 
                 if (!isDisabled) {
-                    await addExtensionScript(name, manifest);
-                    await addExtensionStyle(name, manifest);
-                    activeExtensions.add(name);
+                    const promise = Promise.all([addExtensionScript(name, manifest), addExtensionStyle(name, manifest)]);
+                    promise
+                        .then(() => activeExtensions.add(name))
+                        .catch(err => console.log('Could not activate extension: ' + name, err));
+                    promises.push(promise);
                 }
                 else {
                     li.classList.add('disabled');
@@ -127,6 +170,8 @@ async function activateExtensions() {
             }
         }
     }
+
+    await Promise.allSettled(promises);
 }
 
 async function connectClickHandler() {
@@ -147,6 +192,37 @@ function autoConnectInputHandler() {
     saveSettingsDebounced();
 }
 
+function addExtensionsButtonAndMenu() {
+    const buttonHTML =
+        `<div id="extensionsMenuButton" class="fa-solid fa-magic-wand-sparkles" title="Extras Extensions" /></div>`;
+    const extensionsMenuHTML = `<div id="extensionsMenu" class="list-group"></div>`;
+
+    $(document.body).append(extensionsMenuHTML);
+
+    $('#send_but_sheld').prepend(buttonHTML);
+
+    const button = $('#extensionsMenuButton');
+    const dropdown = $('#extensionsMenu');
+    dropdown.hide();
+
+    let popper = Popper.createPopper(button.get(0), dropdown.get(0), {
+        placement: 'top-end',
+    });
+
+    $(document).on('click touchend', function (e) {
+        const target = $(e.target);
+        if (target.is(dropdown)) return;
+        if (target.is(button) && !dropdown.is(":visible")) {
+            e.preventDefault();
+
+            dropdown.show(200);
+            popper.update();
+        } else {
+            dropdown.hide(200);
+        }
+    });
+}
+
 async function connectToApi(baseUrl) {
     if (!baseUrl) {
         return;
@@ -162,6 +238,7 @@ async function connectToApi(baseUrl) {
             const data = await getExtensionsResult.json();
             modules = data.modules;
             await activateExtensions();
+            eventSource.emit(event_types.EXTRAS_CONNECTED, modules);
         }
 
         updateStatus(getExtensionsResult.ok);
@@ -281,11 +358,29 @@ async function loadExtensionSettings(settings) {
     manifests = await getManifests(extensionNames)
     await activateExtensions();
     if (extension_settings.autoConnect && extension_settings.apiUrl) {
-        await connectToApi(extension_settings.apiUrl);
+        connectToApi(extension_settings.apiUrl);
+    }
+}
+
+async function runGenerationInterceptors(chat) {
+    for (const manifest of Object.values(manifests)) {
+        const interceptorKey = manifest.generate_interceptor;
+        if (typeof window[interceptorKey] === 'function') {
+            try {
+                await window[interceptorKey](chat);
+            } catch (e) {
+                console.error(`Failed running interceptor for ${manifest.display_name}`, e);
+            }
+        }
     }
 }
 
 $(document).ready(async function () {
+    setTimeout(function () {
+        addExtensionsButtonAndMenu();
+        $("#extensionsMenuButton").css("display", "flex");
+    }, 100)
+
     $("#extensions_connect").on('click', connectClickHandler);
     $("#extensions_autoconnect").on('input', autoConnectInputHandler);
     $("#extensions_details").on('click', showExtensionsDetails);

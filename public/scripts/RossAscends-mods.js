@@ -79,7 +79,7 @@ observer.observe(document.documentElement, observerConfig);
 /**
  * Wait for an element before resolving a promise
  * @param {String} querySelector - Selector of element to wait for
- * @param {Integer} timeout - Milliseconds to wait before timing out, or 0 for no timeout              
+ * @param {Integer} timeout - Milliseconds to wait before timing out, or 0 for no timeout
  */
 function waitForElement(querySelector, timeout) {
     return new Promise((resolve, reject) => {
@@ -106,12 +106,22 @@ function waitForElement(querySelector, timeout) {
 waitForElement("#expression-image", 10000).then(function () {
 
     dragElement(document.getElementById("expression-holder"));
+    dragElement(document.getElementById("floatingPrompt"));
+
 }).catch(() => {
     console.log("expression holder not loaded yet");
 });
 
+waitForElement("#floatingPrompt", 10000).then(function () {
+
+    dragElement(document.getElementById("floatingPrompt"));
+
+}).catch(() => {
+    console.log("floating prompt box not loaded yet");
+});
+
 // Device detection
-const deviceInfo = await getDeviceInfo();
+export const deviceInfo = await getDeviceInfo();
 
 async function getDeviceInfo() {
     try {
@@ -125,7 +135,7 @@ async function getDeviceInfo() {
     }
 }
 
-function isMobile() {
+export function isMobile() {
     const mobileTypes = ['smartphone', 'tablet', 'phablet', 'feature phone', 'portable media player'];
     return mobileTypes.includes(deviceInfo?.device?.type);
 }
@@ -249,7 +259,7 @@ export function RA_CountCharTokens() {
                 (power_user.pin_examples ? characters[this_chid].mes_example : ''),
             ].join('\n').replace(/\r/gm, '').trim();
             perm_tokens = getTokenCount(perm_string);
-        } else { console.log("RA_TC -- no valid char found, closing."); }                // if neither, probably safety char or some error in loading
+        } else { console.debug("RA_TC -- no valid char found, closing."); }                // if neither, probably safety char or some error in loading
     }
     // display the counted tokens
     if (count_tokens < 1024 && perm_tokens < 1024) {
@@ -266,10 +276,14 @@ async function RA_autoloadchat() {
     if (document.getElementById('CharID0') !== null) {
         var charToAutoLoad = document.getElementById('CharID' + LoadLocal('ActiveChar'));
         let groupToAutoLoad = document.querySelector(`.group_select[grid="${LoadLocal('ActiveGroup')}"]`);
-        if (charToAutoLoad != null) { $(charToAutoLoad).click(); }
-        else if (groupToAutoLoad != null) { $(groupToAutoLoad).click(); }
+        if (charToAutoLoad != null) {
+            $(charToAutoLoad).click();
+        }
+        else if (groupToAutoLoad != null) {
+            $(groupToAutoLoad).click();
+        }
 
-        // if the charcter list hadn't been loaded yet, try again. 
+        // if the charcter list hadn't been loaded yet, try again.
     } else { setTimeout(RA_autoloadchat, 100); }
 }
 
@@ -323,15 +337,6 @@ export async function favsToHotswap() {
     }
 }
 
-/* function RestoreNavTab() {
-    if ($('#rm_button_selected_ch').children("h2").text() !== '') {
-
-        $(SelectedNavTab).click();                                 
-    } else {
-        setTimeout(RestoreNavTab, 100);                            
-    }
-} */
-
 //changes input bar and send button display depending on connection status
 function RA_checkOnlineStatus() {
     if (online_status == "no_connection") {
@@ -360,7 +365,8 @@ function RA_checkOnlineStatus() {
 //Auto-connect to API (when set to kobold, API URL exists, and auto_connect is true)
 
 function RA_autoconnect(PrevApi) {
-    if (online_status === undefined) {
+    // secrets.js or script.js not loaded
+    if (SECRET_KEYS === undefined || online_status === undefined) {
         setTimeout(RA_autoconnect, 100);
         return;
     }
@@ -394,7 +400,6 @@ function RA_autoconnect(PrevApi) {
         }
 
         if (!connection_made) {
-
             RA_AC_retries++;
             retry_delay = Math.min(retry_delay * 2, 30000); // double retry delay up to to 30 secs
             //console.log('connection attempts: ' + RA_AC_retries + ' delay: ' + (retry_delay / 1000) + 's');
@@ -413,22 +418,25 @@ function isUrlOrAPIKey(string) {
 }
 
 function OpenNavPanels() {
-    //auto-open R nav if locked and previously open
-    if (LoadLocalBool("NavLockOn") == true && LoadLocalBool("NavOpened") == true) {
-        //console.log("RA -- clicking right nav to open");
-        $("#rightNavDrawerIcon").click();
-    }
 
-    //auto-open L nav if locked and previously open
-    if (LoadLocalBool("LNavLockOn") == true && LoadLocalBool("LNavOpened") == true) {
-        console.log("RA -- clicking left nav to open");
-        $("#leftNavDrawerIcon").click();
-    }
+    if (deviceInfo.device.type === 'desktop') {
+        //auto-open R nav if locked and previously open
+        if (LoadLocalBool("NavLockOn") == true && LoadLocalBool("NavOpened") == true) {
+            //console.log("RA -- clicking right nav to open");
+            $("#rightNavDrawerIcon").click();
+        }
 
-    //auto-open WI if locked and previously open
-    if (LoadLocalBool("WINavLockOn") == true && LoadLocalBool("WINavOpened") == true) {
-        console.log("RA -- clicking WI to open");
-        $("#WIDrawerIcon").click();
+        //auto-open L nav if locked and previously open
+        if (LoadLocalBool("LNavLockOn") == true && LoadLocalBool("LNavOpened") == true) {
+            console.debug("RA -- clicking left nav to open");
+            $("#leftNavDrawerIcon").click();
+        }
+
+        //auto-open WI if locked and previously open
+        if (LoadLocalBool("WINavLockOn") == true && LoadLocalBool("WINavOpened") == true) {
+            console.debug("RA -- clicking WI to open");
+            $("#WIDrawerIcon").click();
+        }
     }
 }
 
@@ -443,6 +451,7 @@ dragElement(document.getElementById("WorldInfo"));
 
 
 function dragElement(elmnt) {
+
     var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     if (document.getElementById(elmnt.id + "header")) { //ex: id="sheldheader"
         // if present, the header is where you move the DIV from, but this overrides everything else:
@@ -453,6 +462,7 @@ function dragElement(elmnt) {
     }
 
     function dragMouseDown(e) {
+        //console.log(e);
         e = e || window.event;
         e.preventDefault();
         // get the mouse cursor position at startup:
@@ -553,10 +563,10 @@ function dragElement(elmnt) {
                                         offsetLeft: ${elmnt.offsetLeft}, offsetTop: ${elmnt.offsetTop}
                                         winWidth: ${winWidth}, winHeight: ${winHeight}
                                         sheldWidth: ${sheldWidth}
-                                        X: ${elmnt.style.left} 
-                                        Y: ${elmnt.style.top} 
-                                        MaxX: ${maxX}, MaxY: ${maxY} 
-                                        Topbar 1st X: ${((winWidth - sheldWidth) / 2)} 
+                                        X: ${elmnt.style.left}
+                                        Y: ${elmnt.style.top}
+                                        MaxX: ${maxX}, MaxY: ${maxY}
+                                        Topbar 1st X: ${((winWidth - sheldWidth) / 2)}
                                         TopBar lastX: ${((winWidth - sheldWidth) / 2) + sheldWidth}
                                             `); */
 
@@ -641,14 +651,14 @@ $("document").ready(function () {
     $(WIPanelPin).on("click", function () {
         SaveLocal("WINavLockOn", $(WIPanelPin).prop("checked"));
         if ($(WIPanelPin).prop("checked") == true) {
-            console.log('adding pin class to WI');
+            console.debug('adding pin class to WI');
             $(WorldInfo).addClass('pinnedOpen');
         } else {
-            console.log('removing pin class from WI');
+            console.debug('removing pin class from WI');
             $(WorldInfo).removeClass('pinnedOpen');
 
             if ($(WorldInfo).hasClass('openDrawer') && $('.openDrawer').length > 1) {
-                console.log('closing WI after lock removal');
+                console.debug('closing WI after lock removal');
                 $(WorldInfo).slideToggle(200, "swing");
                 //$(WorldInfoDrawerIcon).toggleClass('openIcon closedIcon');
                 $(WorldInfo).toggleClass('openDrawer closedDrawer');
@@ -663,7 +673,7 @@ $("document").ready(function () {
         $(RightNavPanel).addClass('pinnedOpen');
     }
     if ($(RPanelPin).prop('checked' == true)) {
-        console.log('setting pin class via checkbox state');
+        console.debug('setting pin class via checkbox state');
         $(RightNavPanel).addClass('pinnedOpen');
     }
     // read the state of left Nav Lock and apply to leftnav classlist
@@ -673,7 +683,7 @@ $("document").ready(function () {
         $(LeftNavPanel).addClass('pinnedOpen');
     }
     if ($(LPanelPin).prop('checked' == true)) {
-        console.log('setting pin class via checkbox state');
+        console.debug('setting pin class via checkbox state');
         $(LeftNavPanel).addClass('pinnedOpen');
     }
 
@@ -685,7 +695,7 @@ $("document").ready(function () {
     }
 
     if ($(WIPanelPin).prop('checked' == true)) {
-        console.log('setting pin class via checkbox state');
+        console.debug('setting pin class via checkbox state');
         $(WorldInfo).addClass('pinnedOpen');
     }
 
@@ -741,7 +751,7 @@ $("document").ready(function () {
         SaveLocal('ActiveGroup', $(this).data('id'));
     });
 
-    //this makes the chat input text area resize vertically to match the text size (limited by CSS at 50% window height)    
+    //this makes the chat input text area resize vertically to match the text size (limited by CSS at 50% window height)
     $('#send_textarea').on('input', function () {
         this.style.height = '40px';
         this.style.height = (this.scrollHeight) + 'px';
@@ -832,7 +842,7 @@ $("document").ready(function () {
         }
 
         if (event.ctrlKey && event.key == "ArrowUp") { //edits last USER message if chatbar is empty and focused
-            console.log('got ctrl+uparrow input');
+            console.debug('got ctrl+uparrow input');
             if (
                 $("#send_textarea").val() === '' &&
                 chatbarInFocus === true &&

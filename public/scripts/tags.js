@@ -1,4 +1,12 @@
-import { characters, saveSettingsDebounced, this_chid, callPopup, menu_type } from "../script.js";
+import {
+    characters,
+    saveSettingsDebounced,
+    this_chid,
+    callPopup,
+    menu_type,
+    updateVisibleDivs,
+} from "../script.js";
+
 import { selected_group } from "./group-chats.js";
 
 export {
@@ -49,7 +57,9 @@ function applyFavFilter() {
                 $(this).toggleClass('hiddenByFav', !shouldBeDisplayed);
             }
         }
+
     });
+    updateVisibleDivs();
 }
 
 function filterByGroups() {
@@ -61,6 +71,7 @@ function filterByGroups() {
     $(CHARACTER_SELECTOR).each((_, element) => {
         $(element).toggleClass('hiddenByGroup', displayGroupsOnly && !$(element).hasClass('group_select'));
     });
+    updateVisibleDivs();
 }
 
 function loadTagsSettings(settings) {
@@ -234,6 +245,7 @@ function onTagFilterClick(listElement) {
 
     const tagIds = [...($(listElement).find(".tag.selected:not(.actionable)").map((_, el) => $(el).attr("id")))];
     $(CHARACTER_SELECTOR).each((_, element) => applyFilterToElement(tagIds, element));
+    updateVisibleDivs();
 }
 
 function applyFilterToElement(tagIds, element) {
@@ -414,14 +426,14 @@ function onTagRenameInput() {
 }
 
 function onTagColorize(evt) {
-    console.log(evt);
+    console.debug(evt);
     const id = $(evt.target).closest('.tag_view_item').attr('id');
     const newColor = evt.detail.rgba;
     $(evt.target).parent().parent().find('.tag_view_name').css('background-color', newColor);
     $(`.tag[id="${id}"]`).css('background-color', newColor);
     const tag = tags.find(x => x.id === id);
     tag.color = newColor;
-    console.log(tag);
+    console.debug(tag);
     saveSettingsDebounced();
 }
 
