@@ -8,6 +8,7 @@ export {
     world_info_depth,
     world_info_recursive,
     world_info_case_sensitive,
+    world_info_match_whole_words,
     world_names,
     imported_world_name,
     checkWorldInfo,
@@ -25,9 +26,10 @@ let world_info_budget = 128;
 let is_world_edit_open = false;
 let world_info_recursive = false;
 let world_info_case_sensitive = false;
+let world_info_match_whole_words = false;
 let imported_world_name = "";
-const saveWorldDebounced = debounce(async () => await _save(), 500);
-const saveSettingsDebounced = debounce(() => saveSettings(), 500);
+const saveWorldDebounced = debounce(async () => await _save(), 1000);
+const saveSettingsDebounced = debounce(() => saveSettings(), 1000);
 
 const world_info_position = {
     before: 0,
@@ -55,6 +57,8 @@ function setWorldInfoSettings(settings, data) {
         world_info_recursive = Boolean(settings.world_info_recursive);
     if (settings.world_info_case_sensitive !== undefined)
         world_info_case_sensitive = Boolean(settings.world_info_case_sensitive);
+    if (settings.world_info_match_whole_words !== undefined)
+        world_info_match_whole_words = Boolean(settings.world_info_match_whole_words);
 
     $("#world_info_depth_counter").text(world_info_depth);
     $("#world_info_depth").val(world_info_depth);
@@ -64,6 +68,7 @@ function setWorldInfoSettings(settings, data) {
 
     $("#world_info_recursive").prop('checked', world_info_recursive);
     $("#world_info_case_sensitive").prop('checked', world_info_case_sensitive);
+    $("#world_info_match_whole_words").prop('checked', world_info_match_whole_words);
 
     world_names = data.world_names?.length ? data.world_names : [];
 
@@ -210,6 +215,14 @@ function appendWorldEntry(entry) {
     //initScrollHeight(commentInput);
 
     // content
+    const countTokensDebounced = debounce(function (that, value) {
+        const numberOfTokens = getTokenCount(value);
+        $(that)
+            .closest(".world_entry")
+            .find(".world_entry_form_token_counter")
+            .text(numberOfTokens);
+    }, 1000);
+
     const contentInput = template.find('textarea[name="content"]');
     contentInput.data("uid", entry.uid);
     contentInput.on("input", function () {
@@ -219,11 +232,7 @@ function appendWorldEntry(entry) {
         saveWorldInfo();
 
         // count tokens
-        const numberOfTokens = getTokenCount(value);
-        $(this)
-            .closest(".world_entry")
-            .find(".world_entry_form_token_counter")
-            .html(numberOfTokens);
+        countTokensDebounced(this, value);
     });
     contentInput.val(entry.content).trigger("input");
     //initScrollHeight(contentInput);
@@ -517,7 +526,7 @@ function checkWorldInfo(chat) {
             if (Array.isArray(entry.key) && entry.key.length) {
                 primary: for (let key of entry.key) {
                     const substituted = substituteParams(key);
-                    if (substituted && textToScan.includes(transformString(substituted.trim()))) {
+                    if (substituted && matchKeys(textToScan, substituted.trim())) {
                         if (
                             entry.selective &&
                             Array.isArray(entry.keysecondary) &&
@@ -525,10 +534,7 @@ function checkWorldInfo(chat) {
                         ) {
                             secondary: for (let keysecondary of entry.keysecondary) {
                                 const secondarySubstituted = substituteParams(keysecondary);
-                                if (
-                                    secondarySubstituted &&
-                                    textToScan.includes(transformString(secondarySubstituted.trim()))
-                                ) {
+                                if (secondarySubstituted && matchKeys(textToScan, secondarySubstituted.trim())) {
                                     activatedNow.add(entry.uid);
                                     break secondary;
                                 }
@@ -574,6 +580,29 @@ function checkWorldInfo(chat) {
     }
 
     return { worldInfoBefore, worldInfoAfter };
+}
+
+function matchKeys(haystack, needle) {
+    const transformedString = transformString(needle);
+
+    if (world_info_match_whole_words) {
+        const keyWords = transformedString.split(/\s+/);
+
+        if (keyWords.length > 1) {
+            return haystack.includes(transformedString);
+        }
+        else {
+            const regex = new RegExp(`\\b${transformedString}\\b`);
+            if (regex.test(haystack)) {
+                return true;
+            }
+        }
+
+    } else {
+        return haystack.includes(transformedString);
+    }
+
+    return false;
 }
 
 function selectImportedWorldInfo() {
@@ -699,4 +728,9 @@ jQuery(() => {
         world_info_case_sensitive = !!$(this).prop('checked');
         saveSettingsDebounced();
     })
+
+    $('#world_info_match_whole_words').on('input', function () {
+        world_info_match_whole_words = !!$(this).prop('checked');
+        saveSettingsDebounced();
+    });
 });

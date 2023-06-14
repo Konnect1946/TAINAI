@@ -9,6 +9,9 @@ import {
     getRequestHeaders,
     substituteParams,
     updateVisibleDivs,
+    eventSource,
+    event_types,
+    getCurrentChatId,
 } from "../script.js";
 import { favsToHotswap } from "./RossAscends-mods.js";
 import {
@@ -58,6 +61,8 @@ const tokenizers = {
     GPT3: 1,
     CLASSIC: 2,
     LLAMA: 3,
+    NERD: 4,
+    NERD2: 5,
 }
 
 const send_on_enter_options = {
@@ -124,6 +129,8 @@ let power_user = {
     hotswap_enabled: true,
     timer_enabled: true,
     max_context_unlocked: false,
+    prefer_character_prompt: true,
+    prefer_character_jailbreak: true,
 
     instruct: {
         enabled: false,
@@ -136,7 +143,10 @@ let power_user = {
         output_sequence: '### Response:',
         preset: 'Alpaca',
         separator_sequence: '',
-    }
+    },
+
+    personas: {},
+    default_persona: null,
 };
 
 let themes = [];
@@ -523,6 +533,8 @@ function loadPowerUserSettings(settings, data) {
     $("#allow_name2_display").prop("checked", power_user.allow_name2_display);
     $("#hotswapEnabled").prop("checked", power_user.hotswap_enabled);
     $("#messageTimerEnabled").prop("checked", power_user.timer_enabled);
+    $("#prefer_character_prompt").prop("checked", power_user.prefer_character_prompt);
+    $("#prefer_character_jailbreak").prop("checked", power_user.prefer_character_jailbreak);
     $(`input[name="avatar_style"][value="${power_user.avatar_style}"]`).prop("checked", true);
     $(`input[name="chat_display"][value="${power_user.chat_display}"]`).prop("checked", true);
     $(`input[name="sheld_width"][value="${power_user.sheld_width}"]`).prop("checked", true);
@@ -641,9 +653,14 @@ function loadInstructMode() {
     });
 }
 
-export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar) {
+export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar, name1, name2) {
     const includeNames = isNarrator ? false : (power_user.instruct.names || !!selected_group || !!forceAvatar);
-    const sequence = (isUser || isNarrator) ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
+    const sequence = substituteParams(
+        (isUser || isNarrator) ? power_user.instruct.input_sequence : power_user.instruct.output_sequence,
+        name1,
+        name2
+    );
+
     const separator = power_user.instruct.wrap ? '\n' : '';
     const separatorSequence = power_user.instruct.separator_sequence && !isUser
         ? power_user.instruct.separator_sequence
@@ -653,18 +670,25 @@ export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvata
     return text;
 }
 
-export function formatInstructStoryString(story) {
+export function formatInstructStoryString(story, systemPrompt) {
+    // If the character has a custom system prompt AND user has it preferred, use that instead of the default
+    systemPrompt = power_user.prefer_character_prompt && systemPrompt ? systemPrompt : power_user.instruct.system_prompt;
     const sequence = power_user.instruct.system_sequence || '';
-    const prompt = substituteParams(power_user.instruct.system_prompt) || '';
+    const prompt = substituteParams(systemPrompt) || '';
     const separator = power_user.instruct.wrap ? '\n' : '';
-    const textArray = [sequence, prompt, story, separator];
+    const textArray = [sequence, prompt + '\n' + story, separator];
     const text = textArray.filter(x => x).join(separator);
     return text;
 }
 
-export function formatInstructModePrompt(name, isImpersonate, promptBias) {
+export function formatInstructModePrompt(name, isImpersonate, promptBias, name1, name2) {
     const includeNames = power_user.instruct.names || !!selected_group;
-    const sequence = isImpersonate ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
+    const sequence = substituteParams(
+        isImpersonate ? power_user.instruct.input_sequence : power_user.instruct.output_sequence,
+        name1,
+        name2
+    );
+
     const separator = power_user.instruct.wrap ? '\n' : '';
     let text = includeNames ? (separator + sequence + separator + `${name}:`) : (separator + sequence);
 
@@ -719,7 +743,7 @@ function sortCharactersList() {
     for (const item of array) {
         $(`${item.selector}[${item.attribute}="${item.id}"]`).css({ 'order': orderedList.indexOf(item) });
     }
-    updateVisibleDivs();
+    updateVisibleDivs('#rm_print_characters_block', true);
 }
 
 function sortGroupMembers(selector) {
@@ -836,6 +860,9 @@ function resetMovablePanels() {
     document.getElementById("WorldInfo").style.height = '';
     document.getElementById("WorldInfo").style.width = '';
     document.getElementById("WorldInfo").style.margin = '';
+
+    $('*[data-dragged="true"]').removeAttr('data-dragged');
+    eventSource.emit(event_types.MOVABLE_PANELS_RESET);
 }
 
 $(document).ready(() => {
@@ -910,6 +937,7 @@ $(document).ready(() => {
     $("#custom_chat_separator").on('input', function () {
         power_user.custom_chat_separator = $(this).val();
         saveSettingsDebounced();
+        reloadMarkdownProcessor(power_user.render_formulas);
     });
 
     $("#multigen").change(function () {
@@ -1132,6 +1160,13 @@ $(document).ready(() => {
         saveSettingsDebounced();
     });
 
+    $("#reload_chat").on('click', function () {
+        const currentChatId = getCurrentChatId();
+        if (currentChatId !== undefined && currentChatId !== null) {
+            reloadCurrentChat();
+        }
+    });
+
     $("#allow_name1_display").on("input", function () {
         power_user.allow_name1_display = !!$(this).prop('checked');
         reloadCurrentChat();
@@ -1161,6 +1196,18 @@ $(document).ready(() => {
         power_user.hotswap_enabled = value;
         localStorage.setItem(storage_keys.hotswap_enabled, power_user.hotswap_enabled);
         switchHotswap();
+    });
+
+    $("#prefer_character_prompt").on("input", function () {
+        const value = !!$(this).prop('checked');
+        power_user.prefer_character_prompt = value;
+        saveSettingsDebounced();
+    });
+
+    $("#prefer_character_jailbreak").on("input", function () {
+        const value = !!$(this).prop('checked');
+        power_user.prefer_character_jailbreak = value;
+        saveSettingsDebounced();
     });
 
     $(window).on('focus', function () {

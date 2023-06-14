@@ -5,7 +5,7 @@ export {
     getApiUrl,
     loadExtensionSettings,
     runGenerationInterceptors,
-    defaultRequestArgs,
+    doExtrasFetch,
     modules,
     extension_settings,
     ModuleWorkerWrapper,
@@ -43,8 +43,10 @@ class ModuleWorkerWrapper {
 
 const extension_settings = {
     apiUrl: defaultUrl,
+    apiKey: '',
     autoConnect: false,
     disabledExtensions: [],
+    expressionOverrides: [],
     memory: {},
     note: {
         default: '',
@@ -57,6 +59,7 @@ const extension_settings = {
     chromadb: {},
     translate: {},
     objective: {},
+    quickReply: {},
 };
 
 let modules = [];
@@ -64,8 +67,44 @@ let activeExtensions = new Set();
 
 const getContext = () => window['SillyTavern'].getContext();
 const getApiUrl = () => extension_settings.apiUrl;
-const defaultRequestArgs = { method: 'GET', headers: { 'Bypass-Tunnel-Reminder': 'bypass' } };
 let connectedToApi = false;
+
+function showHideExtensionsMenu() {
+    // Get the number of menu items that are not hidden
+    const hasMenuItems = $('#extensionsMenu').children().filter((_, child) => $(child).css('display') !== 'none').length > 0;
+
+    // We have menu items, so we can stop checking
+    if (hasMenuItems) {
+        clearInterval(menuInterval);
+    }
+
+    // Show or hide the menu button
+    $('#extensionsMenuButton').toggle(hasMenuItems);
+}
+
+// Periodically check for new extensions
+const menuInterval = setInterval(showHideExtensionsMenu, 1000);
+
+async function doExtrasFetch(endpoint, args) {
+    if (!args) {
+        args = {}
+    }
+
+    if (!args.method) {
+        Object.assign(args, { method: 'GET' });
+    }
+
+    if (!args.headers) {
+        args.headers = {}
+    }
+    Object.assign(args.headers, {
+        'Authorization': `Bearer ${extension_settings.apiKey}`,
+        'Bypass-Tunnel-Reminder': 'bypass'
+    });
+
+    const response = await fetch(endpoint, args);
+    return response;
+}
 
 async function discoverExtensions() {
     try {
@@ -177,6 +216,8 @@ async function activateExtensions() {
 async function connectClickHandler() {
     const baseUrl = $("#extensions_url").val();
     extension_settings.apiUrl = baseUrl;
+    const testApiKey = $("#extensions_api_key").val();
+    extension_settings.apiKey = testApiKey;
     saveSettingsDebounced();
     await connectToApi(baseUrl);
 }
@@ -194,8 +235,8 @@ function autoConnectInputHandler() {
 
 function addExtensionsButtonAndMenu() {
     const buttonHTML =
-        `<div id="extensionsMenuButton" class="fa-solid fa-magic-wand-sparkles" title="Extras Extensions" /></div>`;
-    const extensionsMenuHTML = `<div id="extensionsMenu" class="list-group"></div>`;
+        `<div id="extensionsMenuButton" style="display: none;" class="fa-solid fa-magic-wand-sparkles" title="Extras Extensions" /></div>`;
+    const extensionsMenuHTML = `<div id="extensionsMenu" class="options-content" style="display: none;"></div>`;
 
     $(document.body).append(extensionsMenuHTML);
 
@@ -203,25 +244,41 @@ function addExtensionsButtonAndMenu() {
 
     const button = $('#extensionsMenuButton');
     const dropdown = $('#extensionsMenu');
-    dropdown.hide();
+    //dropdown.hide();
 
     let popper = Popper.createPopper(button.get(0), dropdown.get(0), {
         placement: 'top-end',
     });
 
-    $(document).on('click touchend', function (e) {
-        const target = $(e.target);
-        if (target.is(dropdown)) return;
-        if (target.is(button) && !dropdown.is(":visible")) {
-            e.preventDefault();
+    $(button).on('click', function () {
+        popper.update()
+        dropdown.fadeIn(250);
+    });
 
-            dropdown.show(200);
-            popper.update();
-        } else {
-            dropdown.hide(200);
+    $("html").on('touchstart mousedown', function (e) {
+        let clickTarget = $(e.target);
+        if (dropdown.is(':visible')
+            && clickTarget.closest(button).length == 0
+            && clickTarget.closest(dropdown).length == 0) {
+            $(dropdown).fadeOut(250);
         }
     });
 }
+
+/*     $(document).on('click', function (e) {
+        const target = $(e.target);
+        if (target.is(dropdown)) return;
+        if (target.is(button) && dropdown.is(':hidden')) {
+            dropdown.toggle(200);
+            popper.update();
+        }
+        if (target !== dropdown &&
+            target !== button &&
+            dropdown.is(":visible")) {
+            dropdown.hide(200);
+        }
+    });
+} */
 
 async function connectToApi(baseUrl) {
     if (!baseUrl) {
@@ -232,7 +289,7 @@ async function connectToApi(baseUrl) {
     url.pathname = '/api/modules';
 
     try {
-        const getExtensionsResult = await fetch(url, defaultRequestArgs);
+        const getExtensionsResult = await doExtrasFetch(url);
 
         if (getExtensionsResult.ok) {
             const data = await getExtensionsResult.json();
@@ -351,6 +408,7 @@ async function loadExtensionSettings(settings) {
     }
 
     $("#extensions_url").val(extension_settings.apiUrl);
+    $("#extensions_api_key").val(extension_settings.apiKey);
     $("#extensions_autoconnect").prop('checked', extension_settings.autoConnect);
 
     // Activate offline extensions

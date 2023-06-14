@@ -1,4 +1,12 @@
-import { chat_metadata, saveSettingsDebounced } from "../../../script.js";
+import {
+    chat_metadata,
+    eventSource,
+    event_types,
+    getTokenCount,
+    saveSettingsDebounced,
+    this_chid,
+} from "../../../script.js";
+import { selected_group } from "../../group-chats.js";
 import { ModuleWorkerWrapper, extension_settings, getContext, saveMetadataDebounced } from "../../extensions.js";
 import { registerSlashCommand } from "../../slash-commands.js";
 export { MODULE_NAME };
@@ -65,6 +73,7 @@ function setNotePositionCommand(_, text) {
 
 async function onExtensionFloatingPromptInput() {
     chat_metadata[metadata_keys.prompt] = $(this).val();
+    $('#extension_floating_prompt_token_counter').text(getTokenCount(chat_metadata[metadata_keys.prompt]));
     saveMetadataDebounced();
 }
 
@@ -92,6 +101,7 @@ async function onExtensionFloatingPositionInput(e) {
 
 function onExtensionFloatingDefaultInput() {
     extension_settings.note.default = $(this).val();
+    $('#extension_floating_default_token_counter').text(getTokenCount(extension_settings.note.default));
     saveSettingsDebounced();
 }
 
@@ -119,8 +129,8 @@ async function moduleWorker() {
     // take the count of messages
     let lastMessageNumber = Array.isArray(context.chat) && context.chat.length ? context.chat.filter(m => m.is_user).length : 0;
 
-    // special case for new chat
-    if (Array.isArray(context.chat) && context.chat.length === 1) {
+    // interval 1 should be inserted no matter what
+    if (chat_metadata[metadata_keys.interval] === 1) {
         lastMessageNumber = 1;
     }
 
@@ -139,16 +149,60 @@ async function moduleWorker() {
     $('#extension_floating_counter').text(shouldAddPrompt ? '0' : messagesTillInsertion);
 }
 
+function onANMenuItemClick() {
+    if (selected_group || this_chid) {
+        if ($("#floatingPrompt").css("display") !== 'flex') {
+            $("#floatingPrompt").css("display", "flex");
+            $("#floatingPrompt").css("opacity", 0.0);
+            $("#floatingPrompt").transition({
+                opacity: 1.0,
+                duration: 250,
+            });
+
+            if ($("#ANBlockToggle")
+                .siblings('.inline-drawer-content')
+                .css('display') !== 'block') {
+                $("#ANBlockToggle").click();
+            }
+        } else {
+            $("#floatingPrompt").transition({
+                opacity: 0.0,
+                duration: 250,
+            });
+            setTimeout(function () {
+                $("#floatingPrompt").hide();
+            }, 250);
+
+        }
+        //duplicate options menu close handler from script.js
+        //because this listener takes priority
+        $("#options").stop().fadeOut(250);
+    } else {
+        toastr.warning(`Select a character before trying to use Author's Note`, '', { timeOut: 2000 });
+    }
+}
+
+function onChatChanged() {
+    const tokenCounter1 = chat_metadata[metadata_keys.prompt] ? getTokenCount(chat_metadata[metadata_keys.prompt]) : 0;
+    const tokenCounter2 = extension_settings.note.default ? getTokenCount(extension_settings.note.default) : 0;
+    $('#extension_floating_prompt_token_counter').text(tokenCounter1);
+    $('#extension_floating_default_token_counter').text(tokenCounter2);
+}
+
 (function () {
     function addExtensionsSettings() {
         const settingsHtml = `
         <div id="floatingPrompt" class="drawer-content flexGap5">
-            <div id="floatingPromptheader" class="fa-solid fa-grip drag-grabber"></div>
+            <div class="panelControlBar flex-container">
+                <div id="floatingPromptheader" class="fa-solid fa-grip drag-grabber"></div>
+                <div id="ANClose" class="fa-solid fa-circle-xmark"></div>
+            </div>
             <div name="floatingPromptHolder">
                 <div class="inline-drawer">
                     <div id="ANBlockToggle" class="inline-drawer-toggle inline-drawer-header">
                         <b>Author's Note</b>
                         <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+
                 </div>
                 <div class="inline-drawer-content">
                     <small>
@@ -157,6 +211,7 @@ async function moduleWorker() {
                     </small>
 
                     <textarea id="extension_floating_prompt" class="text_pole" rows="8" maxlength="10000"></textarea>
+                    <div class="extension_token_counter">Tokens: <span id="extension_floating_prompt_token_counter">0</small></div>
 
                     <div class="floating_prompt_radio_group">
                         <label>
@@ -172,7 +227,7 @@ async function moduleWorker() {
 
                     <label for="extension_floating_interval">Insertion Frequency</label>
 
-                    <input id="extension_floating_interval" class="text_pole widthUnset" type="number" min="0" max="999"  /><small> (0 = Disable)</small>
+                    <input id="extension_floating_interval" class="text_pole widthUnset" type="number" min="0" max="999"  /><small> (0 = Disable, 1 = Always)</small>
                     <br>
 
                     <span>User inputs until next insertion: <span id="extension_floating_counter">(disabled)</span></span>
@@ -190,18 +245,35 @@ async function moduleWorker() {
 
                         <textarea id="extension_floating_default" class="text_pole" rows="8" maxlength="10000"
                         placeholder="Example:\n[Scenario: wacky adventures; Genre: romantic comedy; Style: verbose, creative]"></textarea>
+                        <div class="extension_token_counter">Tokens: <span id="extension_floating_default_token_counter">0</small></div>
                     </div>
                 </div>
             </div>
         </div>
         `;
 
+        const ANButtonHtml = `
+        <a id="option_toggle_AN">
+           <i class="fa-lg fa-solid fa-note-sticky"></i>
+           <span data-i18n="Author's Note">Author's Note</span>
+        </a>
+    `;
+        $('#options .options-content').prepend(ANButtonHtml);
         $('#movingDivs').append(settingsHtml);
         $('#extension_floating_prompt').on('input', onExtensionFloatingPromptInput);
         $('#extension_floating_interval').on('input', onExtensionFloatingIntervalInput);
         $('#extension_floating_depth').on('input', onExtensionFloatingDepthInput);
         $('#extension_floating_default').on('input', onExtensionFloatingDefaultInput);
         $('input[name="extension_floating_position"]').on('change', onExtensionFloatingPositionInput);
+        $('#ANClose').on('click', function () {
+            $("#floatingPrompt").transition({
+                opacity: 0,
+                duration: 200,
+                easing: 'ease-in-out',
+            });
+            setTimeout(function () { $('#floatingPrompt').hide() }, 200);
+        })
+        $("#option_toggle_AN").on('click', onANMenuItemClick);
     }
 
     addExtensionsSettings();
@@ -211,4 +283,5 @@ async function moduleWorker() {
     registerSlashCommand('depth', setNoteDepthCommand, [], "<span class='monospace'>(number)</span> – sets an author's note depth for in-chat positioning", true, true);
     registerSlashCommand('freq', setNoteIntervalCommand, ['interval'], "<span class='monospace'>(number)</span> – sets an author's note insertion frequency", true, true);
     registerSlashCommand('pos', setNotePositionCommand, ['position'], "(<span class='monospace'>chat</span> or <span class='monospace'>scenario</span>) – sets an author's note position", true, true);
+    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
 })();
