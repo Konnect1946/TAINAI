@@ -14,11 +14,17 @@ import {
     sendSystemMessage,
     setUserName,
     substituteParams,
+    comment_avatar,
     system_avatar,
-    system_message_types
+    system_message_types,
+    replaceCurrentChat,
+    setCharacterId,
+    generateQuietPrompt,
 } from "../script.js";
 import { humanizedDateTime } from "./RossAscends-mods.js";
-import { power_user } from "./power-user.js";
+import { resetSelectedGroup } from "./group-chats.js";
+import { getRegexedString, regex_placement } from "./extensions/regex/engine.js";
+import { chat_styles, power_user } from "./power-user.js";
 export {
     executeSlashCommands,
     registerSlashCommand,
@@ -55,6 +61,7 @@ class SlashCommandParser {
     }
 
     parse(text) {
+        const excludedFromRegex = ["sendas"]
         const firstSpace = text.indexOf(' ');
         const command = firstSpace !== -1 ? text.substring(1, firstSpace) : text.substring(1);
         const args = firstSpace !== -1 ? text.substring(firstSpace + 1) : '';
@@ -76,6 +83,14 @@ class SlashCommandParser {
             }
 
             unnamedArg = argsArray.slice(Object.keys(argObj).length).join(' ');
+
+            // Excluded commands format in their own function
+            if (!excludedFromRegex.includes(command)) {
+                unnamedArg = getRegexedString(
+                    unnamedArg,
+                    regex_placement.SLASH_COMMAND
+                );
+            }
         }
 
         if (this.commands[command]) {
@@ -103,9 +118,81 @@ parser.addCommand('bg', setBackgroundCallback, ['background'], '<span class="mon
 parser.addCommand('sendas', sendMessageAs, [], ` – sends message as a specific character.<br>Example:<br><pre><code>/sendas Chloe\nHello, guys!</code></pre>will send "Hello, guys!" from "Chloe".<br>Uses character avatar if it exists in the characters list.`, true, true);
 parser.addCommand('sys', sendNarratorMessage, [], '<span class="monospace">(text)</span> – sends message as a system narrator', false, true);
 parser.addCommand('sysname', setNarratorName, [], '<span class="monospace">(name)</span> – sets a name for future system narrator messages in this chat (display only). Default: System. Leave empty to reset.', true, true);
+parser.addCommand('comment', sendCommentMessage, [], '<span class="monospace">(text)</span> – adds a note/comment message not part of the chat', false, true);
+parser.addCommand('single', setStoryModeCallback, ['story'], ' – sets the message style to single document mode without names or avatars visible', true, true);
+parser.addCommand('bubble', setBubbleModeCallback, ['bubbles'], ' – sets the message style to bubble chat mode', true, true);
+parser.addCommand('flat', setFlatModeCallback, ['default'], ' – sets the message style to flat chat mode', true, true);
+parser.addCommand('continue', continueChatCallback, ['cont'], ' – continues the last message in the chat', true, true);
+parser.addCommand('go', goToCharacterCallback, ['char'], '<span class="monospace">(name)</span> – opens up a chat with the character by its name', true, true);
+parser.addCommand('sysgen', generateSystemMessage, [], '<span class="monospace">(prompt)</span> – generates a system message using a specified prompt', true, true);
 
 const NARRATOR_NAME_KEY = 'narrator_name';
 const NARRATOR_NAME_DEFAULT = 'System';
+const COMMENT_NAME_DEFAULT = 'Note';
+
+function findCharacterIndex(name) {
+    const matchTypes = [
+        (a, b) => a === b,
+        (a, b) => a.startsWith(b),
+        (a, b) => a.includes(b),
+    ];
+
+    for (const matchType of matchTypes) {
+        const index = characters.findIndex(x => matchType(x.name.toLowerCase(), name.toLowerCase()));
+        if (index !== -1) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+function goToCharacterCallback(_, name) {
+    if (!name) {
+        console.warn('WARN: No character name provided for /go command');
+        return;
+    }
+
+    name = name.trim();
+    const characterIndex = findCharacterIndex(name);
+
+    if (characterIndex !== -1) {
+        openChat(characterIndex);
+    } else {
+        console.warn(`No matches found for name "${name}"`);
+    }
+}
+
+function openChat(id) {
+    resetSelectedGroup();
+    setCharacterId(id);
+    setTimeout(() => {
+        replaceCurrentChat();
+    }, 1);
+}
+
+function continueChatCallback() {
+    // Prevent infinite recursion
+    $('#send_textarea').val('');
+    $('#option_continue').trigger('click', { fromSlashCommand: true });
+}
+
+async function generateSystemMessage(_, prompt) {
+    $('#send_textarea').val('');
+
+    if (!prompt) {
+        console.warn('WARN: No prompt provided for /sysgen command');
+        toastr.warning('You must provide a prompt for the system message');
+        return;
+    }
+
+    // Generate and regex the output if applicable
+    toastr.info('Please wait', 'Generating...');
+    let message = await generateQuietPrompt(prompt);
+    message = getRegexedString(message, regex_placement.SLASH_COMMAND);
+
+    sendNarratorMessage(_, message);
+}
 
 function syncCallback() {
     $('#sync_name_button').trigger('click');
@@ -115,21 +202,36 @@ function bindCallback() {
     $('#lock_user_name').trigger('click');
 }
 
+function setStoryModeCallback() {
+    $('#chat_display').val(chat_styles.DOCUMENT).trigger('change');
+}
+
+function setBubbleModeCallback() {
+    $('#chat_display').val(chat_styles.BUBBLES).trigger('change');
+}
+
+function setFlatModeCallback() {
+    $('#chat_display').val(chat_styles.DEFAULT).trigger('change');
+}
+
 function setNameCallback(_, name) {
     if (!name) {
+        toastr.warning('you must specify a name to change to')
         return;
     }
 
     name = name.trim();
 
     // If the name is a persona, auto-select it
-    if (Object.values(power_user.personas).map(x => x.toLowerCase()).includes(name.toLowerCase())) {
-        autoSelectPersona(name);
+    for (let persona of Object.values(power_user.personas)) {
+        if (persona.toLowerCase() === name.toLowerCase()) {
+            autoSelectPersona(name);
+            return;
+        }
     }
+
     // Otherwise, set just the name
-    else {
-        setUserName(name);
-    }
+    setUserName(name); //this prevented quickReply usage
 }
 
 function setNarratorName(_, text) {
@@ -145,14 +247,17 @@ async function sendMessageAs(_, text) {
     }
 
     const parts = text.split('\n');
-
     if (parts.length <= 1) {
         toastr.warning('Both character name and message are required. Separate them with a new line.');
         return;
     }
 
     const name = parts.shift().trim();
-    const mesText = parts.join('\n').trim();
+    let mesText = parts.join('\n').trim();
+
+    // Requires a regex check after the slash command is pushed to output
+    mesText = getRegexedString(mesText, regex_placement.SLASH_COMMAND, { characterOverride: name });
+
     // Messages that do nothing but set bias will be hidden from the context
     const bias = extractMessageBias(mesText);
     const isSystem = replaceBiasMarkup(mesText).trim().length === 0;
@@ -221,9 +326,56 @@ async function sendNarratorMessage(_, text) {
     saveChatConditional();
 }
 
-function helpCommandCallback() {
-    sendSystemMessage(system_message_types.HELP);
+async function sendCommentMessage(_, text) {
+    if (!text) {
+        return;
+    }
+
+    const message = {
+        name: COMMENT_NAME_DEFAULT,
+        is_user: false,
+        is_name: true,
+        is_system: true,
+        send_date: humanizedDateTime(),
+        mes: substituteParams(text.trim()),
+        force_avatar: comment_avatar,
+        extra: {
+            type: system_message_types.COMMENT,
+            gen_id: Date.now(),
+        },
+    };
+
+    chat.push(message);
+    addOneMessage(message);
+    await eventSource.emit(event_types.MESSAGE_SENT, (chat.length - 1));
+    saveChatConditional();
 }
+
+function helpCommandCallback(_, type) {
+    switch (type?.trim()) {
+        case 'slash':
+        case '1':
+            sendSystemMessage(system_message_types.SLASH_COMMANDS);
+            break;
+        case 'format':
+        case '2':
+            sendSystemMessage(system_message_types.FORMATTING);
+            break;
+        case 'hotkeys':
+        case '3':
+            sendSystemMessage(system_message_types.HOTKEYS);
+            break;
+        case 'macros':
+        case '4':
+            sendSystemMessage(system_message_types.MACROS);
+            break;
+        default:
+            sendSystemMessage(system_message_types.HELP);
+            break;
+    }
+}
+
+window['displayHelp'] = (page) => helpCommandCallback(null, page);
 
 function setBackgroundCallback(_, bg) {
     if (!bg) {
@@ -244,7 +396,7 @@ function executeSlashCommands(text) {
 
     // Hack to allow multi-line slash commands
     // All slash command messages should begin with a slash
-    const lines = [text];
+    const lines = text.split('|').map(line => line.trim());
     const linesToRemove = [];
 
     let interrupt = false;

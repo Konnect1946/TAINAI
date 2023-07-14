@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const _ = require('lodash');
 
 const directory = __dirname;
 
@@ -80,7 +81,7 @@ function extractFormKey(html) {
     }
     const formKey = formKeyList.join("");
 
-    return formKey;
+    return formKey.slice(0, -1);
 }
 
 
@@ -265,22 +266,136 @@ function generate_payload(query, variables) {
 }
 
 async function request_with_retries(method, attempts = 10) {
-    const url = '';
     for (let i = 0; i < attempts; i++) {
+
         try {
+            var ResponseHasFreeSocket = false;
             const response = await method();
             if (response.status === 200) {
+
+                const circularReference = new Set();
+                const responseString = JSON.stringify(response, function (key, value) {
+                    if (typeof value === 'object' && value !== null) {
+                        if (circularReference.has(value)) {
+                            return;
+                        }
+                        circularReference.add(value);
+                    }
+                    if (key === 'data' && typeof value === 'object' && value !== null) {
+                        return '[removed data spam]';
+                    }
+                    if (typeof value === 'object' && value !== null) {
+                        return Array.isArray(value) ? value : { ...value };
+                    }
+
+                    if (key === "freeSockets" && key.length) {
+                        ResponseHasFreeSocket = true;
+                    }
+                    if (key === "Cookie" || key === "set-cookie" || key === "Set-Cookie") {
+                        return "[PB COOKIE DATA REDACTED BY ST CODE]"
+                    }
+                    if (typeof value === 'string' && value.includes('p-b=')) {
+                        const startIndex = value.indexOf('p-b=');
+                        const endIndex = value.indexOf(';', startIndex);
+                        if (endIndex === -1) {
+                            return value.substring(0, startIndex) + '[P-B COOKIE REDACTED BY ST]';
+                        }
+                        return value.substring(0, startIndex) + '[P-B COOKIE REDACTED BY ST]' + value.substring(endIndex);
+                    }
+                    if (typeof value === 'string' && value.includes('__cf_bm=')) {
+                        const startIndex = value.indexOf('__cf_bm=');
+                        const endIndex = value.indexOf(';', startIndex);
+                        if (endIndex === -1) {
+                            return value.substring(0, startIndex) + '[Cloudflare COOKIE REDACTED BY ST]';
+                        }
+                        return value.substring(0, startIndex) + '[CloudFlare COOKIE REDACTED BY ST]' + value.substring(endIndex);
+                    }
+
+
+                    return value;
+                }, 4);
+                fs.writeFile('poe-success.log', responseString, 'utf-8', () => {
+                    //console.log('Successful query logged to poe-success.log');
+                });
+
+
                 return response;
             }
-            logger.warn(`Server returned a status code of ${response.status} while downloading ${url}. Retrying (${i + 1}/${attempts})...`);
-        }
-        catch (err) {
-            console.log(err);
+
+            //this never actually gets seen as any non-200 response jumps to the catch code
+            logger.warn(`Server returned a status code of ${response.status} while downloading. Retrying (${i + 1}/${attempts})...`);
+        } catch (err) {
+            var ErrorHasFreeSocket = false;
+            const circularReference = new Set();
+            const errString = JSON.stringify(err, function (key, value) {
+                if (key === 'data' && Array.isArray(value)) {
+                    return '[removed data spam]';
+                } else if (typeof value === 'object' && value !== null) {
+                    if (circularReference.has(value)) {
+                        return '[Circular]';
+                    }
+                    circularReference.add(value);
+                }
+                if (key === "Cookie" || key === "set-cookie" || key === "Set-Cookie") {
+                    return "[PB COOKIE DATA REDACTED BY ST CODE]"
+                }
+                if (typeof value === 'string' && value.includes('p-b=')) {
+                    const startIndex = value.indexOf('p-b=');
+                    const endIndex = value.indexOf(';', startIndex);
+                    if (endIndex === -1) {
+                        return value.substring(0, startIndex) + '[P-B COOKIE REDACTED BY ST]';
+                    }
+                    return value.substring(0, startIndex) + '[P-B COOKIE REDACTED BY ST]' + value.substring(endIndex);
+                }
+                if (typeof value === 'string' && value.includes('__cf_bm=')) {
+                    const startIndex = value.indexOf('__cf_bm=');
+                    const endIndex = value.indexOf(';', startIndex);
+                    if (endIndex === -1) {
+                        return value.substring(0, startIndex) + '[Cloudflare COOKIE REDACTED BY ST]';
+                    }
+                    return value.substring(0, startIndex) + '[CloudFlare COOKIE REDACTED BY ST]' + value.substring(endIndex);
+                }
+                if (key === "freeSockets" && key.length) {
+                    ErrorHasFreeSocket = true;
+                }
+                return value;
+            }, 4);
+            fs.writeFile('poe-error.log', errString, 'utf-8', (err) => {
+                if (err) throw err;
+                console.log(`Error saved to poe-error.log Free socket? ${ErrorHasFreeSocket}`);
+            });
+            await delay(100)
         }
     }
-    throw new Error(`Failed to download ${url} too many times.`);
+    throw new Error(`Failed to download too many times.`);
 }
 
+function findKey(obj, key, path = []) {
+    if (obj && typeof obj === 'object') {
+        if (key in obj) {
+            return [...path, key];
+        }
+        for (const k in obj) {
+            const result = findKey(obj[k], key, [...path, k]);
+            if (result) {
+                return result;
+            }
+        }
+    }
+    return false;
+}
+
+function logObjectStructure(obj, indent = 0, depth = Infinity) {
+    let result = "";
+    const keys = Object.keys(obj);
+    keys.forEach((key) => {
+        result += `${'  '.repeat(indent)}${key}\n`;
+        if (typeof obj[key] === 'object' && obj[key] !== null && indent < depth) {
+            result += logObjectStructure(obj[key], indent + 1, depth);
+        }
+    });
+    return result;
+}
 class Client {
     gql_url = "https://poe.com/api/gql_POST";
     gql_recv_url = "https://poe.com/api/receive_POST";
@@ -339,13 +454,13 @@ class Client {
         };
         this.session.defaults.headers.common = this.headers;
         [this.next_data, this.channel] = await Promise.all([this.get_next_data(), this.get_channel_data()]);
-        this.bots = await this.get_bots();
-        this.bot_names = this.get_bot_names();
         this.gql_headers = {
             "poe-formkey": this.formkey,
             "poe-tchannel": this.channel["channel"],
             ...this.headers,
         };
+        this.bots = await this.get_bots();
+        this.bot_names = this.get_bot_names();
         if (this.device_id === null) {
             this.device_id = this.get_device_id();
         }
@@ -363,27 +478,92 @@ class Client {
     async get_next_data() {
         logger.info('Downloading next_data...');
 
+        //these keys are used as of June 29, 2023
+        //if API changes in the future, just change these to find the new path
+        const viewerKeyName = 'viewer'
+        const botNameKeyName = 'chatOfBotHandle'
+        const defaultBotKeyName = 'defaultBotNickname'
+        //console.log('this.session.get(this.home_url)')
         const r = await request_with_retries(() => this.session.get(this.home_url));
         const jsonRegex = /<script id="__NEXT_DATA__" type="application\/json">(.+?)<\/script>/;
         const jsonText = jsonRegex.exec(r.data)[1];
         const nextData = JSON.parse(jsonText);
 
+        const viewerPath = findKey(nextData, viewerKeyName);
+        const botNamePath = findKey(nextData, botNameKeyName);
+        const defaultBotPath = findKey(nextData, defaultBotKeyName);
+
+
+
+        let viewer = null;
+        if (viewerPath) {
+            viewer = _.get(nextData, viewerPath.join('.'));
+        }
+
+        //if the API changes, these reports will tell us how it changed
+        if (viewerPath) {
+            console.log(`'${viewerKeyName}' key: ${viewerPath.join('.')}`);
+        } else {
+            console.log(`ERROR: '${viewerKeyName}' key not found.`);
+            //console.log(logObjectStructure(nextData, 0, 2));
+        }
+        if (botNamePath) {
+            console.log(`'${botNameKeyName}' key: ${botNamePath.join('.')}`);
+        } else {
+            console.log(`ERROR: '${botNameKeyName}' key not found.`);
+            //console.log(logObjectStructure(nextData, 0, 2));
+        }
+
+        if (defaultBotPath) {
+            console.log(`'${defaultBotKeyName}' key: ${defaultBotPath.join('.')}`);
+        } else {
+            console.log(`ERROR: '${defaultBotKeyName}' key not found.`);
+
+        }
+
+        if (!viewerPath || !botNamePath || !defaultBotPath) {
+            console.log('-----------------')
+            console.log("ERROR READING POE API! THIS IS THE RESPONSE STRUCTURE:")
+            console.log("SEARCH THIS LIST FOR 'chatOfBotDisplayName', 'viewer', AND 'defaultBotNickname'...")
+            console.log("-----------------")
+            console.log(logObjectStructure(nextData, 0, 4));
+            console.log("-----------------")
+        }
+
         this.formkey = extractFormKey(r.data);
-        this.viewer = nextData.props.pageProps.payload.viewer;
+        this.viewer = viewer;
+
+        //old hard coded message no longer needed
+        //this.viewer = nextData.props.pageProps.payload?.viewer || nextData.props.pageProps.data?.viewer;
 
         return nextData;
     }
 
     async get_bots() {
-        const viewer = this.next_data.props.pageProps.payload.viewer;
+        const viewer = this.viewer;
         if (!viewer.availableBotsConnection) {
             throw new Error('Invalid token.');
         }
         const botList = viewer.availableBotsConnection.edges.map(x => x.node);
+
+        try {
+            const botsQuery = await this.send_query('BotSwitcherModalQuery', {});
+            botsQuery.data.viewer.availableBotsConnection.edges.forEach(edge => {
+                const bot = edge.node;
+
+                if (botList.findIndex(x => x.id === bot.id) === -1) {
+                    botList.push(bot);
+                }
+            });
+        } catch (e) {
+            console.log(e);
+        }
+
         const retries = 2;
         const bots = {};
         const promises = [];
         for (const bot of botList.filter(x => x.deletionState == 'not_deleted')) {
+            await delay(300)
             const promise = new Promise(async (resolve, reject) => {
                 try {
                     const url = `https://poe.com/_next/data/${this.next_data.buildId}/${bot.displayName}.json`;
@@ -393,12 +573,13 @@ class Client {
                         r = cached_bots[url];
                     }
                     else {
-                        logger.info(`Downloading ${url}`);
+                        logger.info(`Downloading ${bot.displayName}`);
+                        //console.log('this.session.get(url)')
                         r = await request_with_retries(() => this.session.get(url), retries);
                         cached_bots[url] = r;
                     }
 
-                    const chatData = r.data.pageProps.payload.chatOfBotDisplayName;
+                    const chatData = r.data.pageProps.payload?.chatOfBotDisplayName || r.data.pageProps.data?.chatOfBotHandle;
                     bots[chatData.defaultBotObject.nickname] = chatData;
                     resolve();
 
@@ -427,6 +608,7 @@ class Client {
 
     async get_channel_data(channel = null) {
         logger.info('Downloading channel data...');
+        //console.log('this.session.get(this.settings_url)')
         const r = await request_with_retries(() => this.session.get(this.settings_url));
         const data = r.data;
 
@@ -449,6 +631,9 @@ class Client {
             const _headers = this.gql_headers;
             _headers['poe-tag-id'] = md5()(scramblePayload + this.formkey + "WpuLMiXEKKE98j56k");
             _headers['poe-formkey'] = this.formkey;
+            //console.log(`------GQL HEADERS-----`)
+            //console.log(this.gql_headers)
+            //console.log(`----------------------`)
             const r = await request_with_retries(() => this.session.post(this.gql_url, payload, { headers: this.gql_headers }));
             if (!(r?.data?.data)) {
                 logger.warn(`${queryName} returned an error | Retrying (${i + 1}/20)`);
@@ -661,14 +846,14 @@ class Client {
                     signal.throwIfAborted();
                 }
 
-                if (timeout == 0) {
+                if (timeout <= 0) {
                     throw new Error("Response timed out.");
                 }
 
                 const message = this.message_queues[humanMessageId].shift();
                 if (!message) {
-                    timeout -= 1;
-                    await delay(1000);
+                    timeout -= 0.1;
+                    await delay(100);
                     continue;
                     //throw new Error("Queue is empty");
                 }

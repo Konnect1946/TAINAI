@@ -1,12 +1,13 @@
 import { callPopup, cancelTtsPlay, eventSource, event_types, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
 import { ModuleWorkerWrapper, extension_settings, getContext } from '../../extensions.js'
-import { getStringHash } from '../../utils.js'
+import { escapeRegex, getStringHash } from '../../utils.js'
 import { EdgeTtsProvider } from './edge.js'
 import { ElevenLabsTtsProvider } from './elevenlabs.js'
 import { SileroTtsProvider } from './silerotts.js'
 import { SystemTtsProvider } from './system.js'
 import { NovelTtsProvider } from './novel.js'
 import { isMobile } from '../../RossAscends-mods.js'
+import { power_user } from '../../power-user.js'
 
 const UPDATE_INTERVAL = 1000
 
@@ -56,7 +57,7 @@ export function getPreviewString(lang) {
     }
     const fallbackPreview = 'Neque porro quisquam est qui dolorem ipsum quia dolor sit amet'
 
-    return  previewStrings[lang] ?? fallbackPreview;
+    return previewStrings[lang] ?? fallbackPreview;
 }
 
 let ttsProviders = {
@@ -172,7 +173,7 @@ function resetTtsPlayback() {
 
     // Reset audio element
     audioElement.currentTime = 0;
-    audioElement.src = '/sounds/silence.mp3';
+    audioElement.src = '';
 
     // Clear any queue items
     ttsJobQueue.splice(0, ttsJobQueue.length);
@@ -409,6 +410,12 @@ async function processTtsQueue() {
     console.log(`TTS: ${text}`)
     const char = currentTtsJob.name
 
+    // Remove character name from start of the line if power user setting is disabled
+    if (char && !power_user.allow_name2_display) {
+        const escapedChar = escapeRegex(char);
+        text = text.replace(new RegExp(`^${escapedChar}:`, 'gm'), '');
+    }
+
     try {
         if (!text) {
             console.warn('Got empty text in TTS queue job.');
@@ -638,23 +645,23 @@ $(document).ready(function () {
                     <div>
                         <label class="checkbox_label" for="tts_enabled">
                             <input type="checkbox" id="tts_enabled" name="tts_enabled">
-                            Enabled
+                            <small>Enabled</small>
                         </label>
                         <label class="checkbox_label" for="tts_auto_generation">
                             <input type="checkbox" id="tts_auto_generation">
-                            Auto Generation
-                        </label>
-                        <label class="checkbox_label" for="tts_narrate_dialogues">
-                            <input type="checkbox" id="tts_narrate_dialogues">
-                            Narrate dialogues only
+                            <small>Auto Generation</small>
                         </label>
                         <label class="checkbox_label" for="tts_narrate_quoted">
                             <input type="checkbox" id="tts_narrate_quoted">
-                            Narrate quoted only
+                            <small>Only narrate "quotes"</small>
+                        </label>
+                        <label class="checkbox_label" for="tts_narrate_dialogues">
+                            <input type="checkbox" id="tts_narrate_dialogues">
+                            <small>Ignore *text, even "quotes", inside asterisks*</small>
                         </label>
                         <label class="checkbox_label" for="tts_narrate_translated_only">
                             <input type="checkbox" id="tts_narrate_translated_only">
-                            Narrate only the translated text
+                            <small>Narrate only the translated text</small>
                         </label>
                     </div>
                     <label>Voice Map</label>
@@ -696,26 +703,4 @@ $(document).ready(function () {
     const wrapper = new ModuleWorkerWrapper(moduleWorker);
     setInterval(wrapper.update.bind(wrapper), UPDATE_INTERVAL) // Init depends on all the things
     eventSource.on(event_types.MESSAGE_SWIPED, resetTtsPlayback);
-
-    // Mobiles need to "activate" the Audio element with click before it can be played
-    if (isMobile()) {
-        console.debug('Activating mobile audio element on first click');
-        let audioActivated = false;
-
-        // Play silence on first click
-        $(document).on('click touchend', function () {
-            // Prevent multiple activations
-            if (audioActivated) {
-                return;
-            }
-
-            console.debug('Activating audio element...');
-            audioActivated = true;
-            audioElement.src = '/sounds/silence.mp3';
-            // Reset volume to 1
-            audioElement.onended = function () {
-                console.debug('Audio element activated');
-            };
-        });
-    }
 })
