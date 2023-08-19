@@ -17,9 +17,10 @@ import {
     comment_avatar,
     system_avatar,
     system_message_types,
-    replaceCurrentChat,
     setCharacterId,
     generateQuietPrompt,
+    reloadCurrentChat,
+    sendMessageAsUser,
 } from "../script.js";
 import { humanizedDateTime } from "./RossAscends-mods.js";
 import { resetSelectedGroup } from "./group-chats.js";
@@ -125,10 +126,57 @@ parser.addCommand('flat', setFlatModeCallback, ['default'], ' – sets the messa
 parser.addCommand('continue', continueChatCallback, ['cont'], ' – continues the last message in the chat', true, true);
 parser.addCommand('go', goToCharacterCallback, ['char'], '<span class="monospace">(name)</span> – opens up a chat with the character by its name', true, true);
 parser.addCommand('sysgen', generateSystemMessage, [], '<span class="monospace">(prompt)</span> – generates a system message using a specified prompt', true, true);
+parser.addCommand('delname', deleteMessagesByNameCallback, ['cancel'], '<span class="monospace">(name)</span> – deletes all messages attributed to a specified name', true, true);
+parser.addCommand('send', sendUserMessageCallback, ['add'], '<span class="monospace">(text)</span> – adds a user message to the chat log without triggering a generation', true, true);
 
 const NARRATOR_NAME_KEY = 'narrator_name';
 const NARRATOR_NAME_DEFAULT = 'System';
 const COMMENT_NAME_DEFAULT = 'Note';
+
+async function sendUserMessageCallback(_, text) {
+    if (!text) {
+        console.warn('WARN: No text provided for /send command');
+        return;
+    }
+
+    text = text.trim();
+    const bias = extractMessageBias(text);
+    sendMessageAsUser(text, bias);
+}
+
+async function deleteMessagesByNameCallback(_, name) {
+    if (!name) {
+        console.warn('WARN: No name provided for /delname command');
+        return;
+    }
+
+    name = name.trim();
+
+    const messagesToDelete = [];
+    chat.forEach((value) => {
+        if (value.name === name) {
+            messagesToDelete.push(value);
+        }
+    });
+
+    if (!messagesToDelete.length) {
+        console.debug('/delname: Nothing to delete');
+        return;
+    }
+
+    for (const message of messagesToDelete) {
+        const index = chat.indexOf(message);
+        if (index !== -1) {
+            console.debug(`/delname: Deleting message #${index}`, message);
+            chat.splice(index, 1);
+        }
+    }
+
+    await saveChatConditional();
+    await reloadCurrentChat();
+
+    toastr.info(`Deleted ${messagesToDelete.length} messages from ${name}`);
+}
 
 function findCharacterIndex(name) {
     const matchTypes = [
@@ -157,7 +205,7 @@ function goToCharacterCallback(_, name) {
     const characterIndex = findCharacterIndex(name);
 
     if (characterIndex !== -1) {
-        openChat(characterIndex);
+        openChat(new String(characterIndex));
     } else {
         console.warn(`No matches found for name "${name}"`);
     }
@@ -167,7 +215,7 @@ function openChat(id) {
     resetSelectedGroup();
     setCharacterId(id);
     setTimeout(() => {
-        replaceCurrentChat();
+        reloadCurrentChat();
     }, 1);
 }
 
@@ -375,7 +423,11 @@ function helpCommandCallback(_, type) {
     }
 }
 
-window['displayHelp'] = (page) => helpCommandCallback(null, page);
+$(document).on('click', '[data-displayHelp]', function (e) {
+    e.preventDefault();
+    const page = String($(this).data('displayhelp'));
+    helpCommandCallback(null, page);
+});
 
 function setBackgroundCallback(_, bg) {
     if (!bg) {

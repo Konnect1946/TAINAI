@@ -3,15 +3,23 @@ import {
     getStoppingStrings,
     max_context,
     saveSettingsDebounced,
+    setGenerationParamsFromPreset,
 } from "../script.js";
+
+import { getCfg } from "./extensions/cfg/util.js";
+
+import {
+    power_user,
+} from "./power-user.js";
 
 export {
     textgenerationwebui_settings,
     loadTextGenSettings,
     generateTextGenWithStreaming,
+    formatTextGenURL,
 }
 
-let textgenerationwebui_settings = {
+const textgenerationwebui_settings = {
     temp: 0.7,
     top_p: 0.5,
     top_k: 40,
@@ -21,6 +29,7 @@ let textgenerationwebui_settings = {
     eta_cutoff: 0,
     typical_p: 1,
     rep_pen: 1.2,
+    rep_pen_range: 0,
     no_repeat_ngram_size: 0,
     penalty_alpha: 0,
     num_beams: 1,
@@ -38,14 +47,20 @@ let textgenerationwebui_settings = {
     skip_special_tokens: true,
     streaming: false,
     streaming_url: 'ws://127.0.0.1:5005/api/v1/stream',
+    mirostat_mode: 0,
+    mirostat_tau: 5,
+    mirostat_eta: 0.1,
+    guidance_scale: 1,
+    negative_prompt: '',
 };
 
-let textgenerationwebui_presets = [];
-let textgenerationwebui_preset_names = [];
+export let textgenerationwebui_presets = [];
+export let textgenerationwebui_preset_names = [];
 
 const setting_names = [
     "temp",
     "rep_pen",
+    "rep_pen_range",
     "no_repeat_ngram_size",
     "top_k",
     "top_p",
@@ -67,6 +82,11 @@ const setting_names = [
     "skip_special_tokens",
     "streaming",
     "streaming_url",
+    "mirostat_mode",
+    "mirostat_tau",
+    "mirostat_eta",
+    "guidance_scale",
+    "negative_prompt",
 ];
 
 function selectPreset(name) {
@@ -81,7 +101,25 @@ function selectPreset(name) {
         const value = preset[name];
         setSettingByName(name, value, true);
     }
+    setGenerationParamsFromPreset(preset);
     saveSettingsDebounced();
+}
+
+function formatTextGenURL(value, use_mancer) {
+    try {
+        const url = new URL(value);
+        if (!power_user.relaxed_api_urls) {
+            if (use_mancer) { // If Mancer is in use, only require the URL to *end* with `/api`.
+                if (!url.pathname.endsWith('/api')) {
+                    return null;
+                }
+            } else {
+                url.pathname = '/api';
+            }
+        }
+        return url.toString();
+    } catch { } // Just using URL as a validation check
+    return null;
 }
 
 function convertPresets(presets) {
@@ -120,7 +158,7 @@ $(document).ready(function () {
         $(`#${i}_textgenerationwebui`).attr("x-setting-id", i);
         $(document).on("input", `#${i}_textgenerationwebui`, function () {
             const isCheckbox = $(this).attr('type') == 'checkbox';
-            const isText = $(this).attr('type') == 'text';
+            const isText = $(this).attr('type') == 'text' || $(this).is('textarea');
             const id = $(this).attr("x-setting-id");
 
             if (isCheckbox) {
@@ -148,7 +186,7 @@ function setSettingByName(i, value, trigger) {
     }
 
     const isCheckbox = $(`#${i}_textgenerationwebui`).attr('type') == 'checkbox';
-    const isText = $(`#${i}_textgenerationwebui`).attr('type') == 'text';
+    const isText = $(`#${i}_textgenerationwebui`).attr('type') == 'text' || $(`#${i}_textgenerationwebui`).is('textarea');
     if (isCheckbox) {
         const val = Boolean(value);
         $(`#${i}_textgenerationwebui`).prop('checked', val);
@@ -198,6 +236,8 @@ async function generateTextGenWithStreaming(generate_data, signal) {
 }
 
 export function getTextGenGenerationData(finalPromt, this_amount_gen, isImpersonate) {
+    const cfgValues = getCfg();
+
     return {
         'prompt': finalPromt,
         'max_new_tokens': this_amount_gen,
@@ -206,6 +246,7 @@ export function getTextGenGenerationData(finalPromt, this_amount_gen, isImperson
         'top_p': textgenerationwebui_settings.top_p,
         'typical_p': textgenerationwebui_settings.typical_p,
         'repetition_penalty': textgenerationwebui_settings.rep_pen,
+        'repetition_penalty_range': textgenerationwebui_settings.rep_pen_range,
         'encoder_repetition_penalty': textgenerationwebui_settings.encoder_rep_pen,
         'top_k': textgenerationwebui_settings.top_k,
         'min_length': textgenerationwebui_settings.min_length,
@@ -214,6 +255,8 @@ export function getTextGenGenerationData(finalPromt, this_amount_gen, isImperson
         'penalty_alpha': textgenerationwebui_settings.penalty_alpha,
         'length_penalty': textgenerationwebui_settings.length_penalty,
         'early_stopping': textgenerationwebui_settings.early_stopping,
+        'guidance_scale': cfgValues?.guidanceScale ?? textgenerationwebui_settings.guidance_scale ?? 1,
+        'negative_prompt': cfgValues?.negativePrompt ?? textgenerationwebui_settings.negative_prompt ?? '',
         'seed': textgenerationwebui_settings.seed,
         'add_bos_token': textgenerationwebui_settings.add_bos_token,
         'stopping_strings': getStoppingStrings(isImpersonate, false),
@@ -224,5 +267,8 @@ export function getTextGenGenerationData(finalPromt, this_amount_gen, isImperson
         'tfs': textgenerationwebui_settings.tfs,
         'epsilon_cutoff': textgenerationwebui_settings.epsilon_cutoff,
         'eta_cutoff': textgenerationwebui_settings.eta_cutoff,
+        'mirostat_mode': textgenerationwebui_settings.mirostat_mode,
+        'mirostat_tau': textgenerationwebui_settings.mirostat_tau,
+        'mirostat_eta': textgenerationwebui_settings.mirostat_eta,
     };
 }

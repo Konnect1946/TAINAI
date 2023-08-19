@@ -1,7 +1,7 @@
-import { saveSettings, callPopup, substituteParams, getTokenCount, getRequestHeaders, chat_metadata, this_chid, characters, saveCharacterDebounced, menu_type } from "../script.js";
-import { download, debounce, initScrollHeight, resetScrollHeight, parseJsonFile, extractDataFromPng, getFileBuffer, delay, getCharaFilename, deepClone } from "./utils.js";
+import { saveSettings, callPopup, substituteParams, getTokenCount, getRequestHeaders, chat_metadata, this_chid, characters, saveCharacterDebounced, menu_type, eventSource, event_types } from "../script.js";
+import { download, debounce, initScrollHeight, resetScrollHeight, parseJsonFile, extractDataFromPng, getFileBuffer, getCharaFilename, deepClone, getSortableDelay, escapeRegex } from "./utils.js";
 import { getContext } from "./extensions.js";
-import { NOTE_MODULE_NAME, metadata_keys, shouldWIAddPrompt } from "./extensions/floating-prompt/index.js";
+import { NOTE_MODULE_NAME, metadata_keys, shouldWIAddPrompt } from "./authors-note.js";
 import { registerSlashCommand } from "./slash-commands.js";
 import { deviceInfo } from "./RossAscends-mods.js";
 
@@ -10,9 +10,11 @@ export {
     world_info_budget,
     world_info_depth,
     world_info_recursive,
+    world_info_overflow_alert,
     world_info_case_sensitive,
     world_info_match_whole_words,
     world_info_character_strategy,
+    world_info_budget_cap,
     world_names,
     checkWorldInfo,
     deleteWorldInfo,
@@ -32,15 +34,31 @@ let world_names;
 let world_info_depth = 2;
 let world_info_budget = 25;
 let world_info_recursive = false;
+let world_info_overflow_alert = false;
 let world_info_case_sensitive = false;
 let world_info_match_whole_words = false;
 let world_info_character_strategy = world_info_insertion_strategy.character_first;
+let world_info_budget_cap = 0;
 const saveWorldDebounced = debounce(async (name, data) => await _save(name, data), 1000);
 const saveSettingsDebounced = debounce(() => {
     Object.assign(world_info, { globalSelect: selected_world_info })
     saveSettings()
 }, 1000);
 const sortFn = (a, b) => b.order - a.order;
+
+export function getWorldInfoSettings() {
+    return {
+        world_info,
+        world_info_depth,
+        world_info_budget,
+        world_info_recursive,
+        world_info_overflow_alert,
+        world_info_case_sensitive,
+        world_info_match_whole_words,
+        world_info_character_strategy,
+        world_info_budget_cap,
+    }
+}
 
 const world_info_position = {
     before: 0,
@@ -70,12 +88,16 @@ function setWorldInfoSettings(settings, data) {
         world_info_budget = Number(settings.world_info_budget);
     if (settings.world_info_recursive !== undefined)
         world_info_recursive = Boolean(settings.world_info_recursive);
+    if (settings.world_info_overflow_alert !== undefined)
+        world_info_overflow_alert = Boolean(settings.world_info_overflow_alert);
     if (settings.world_info_case_sensitive !== undefined)
         world_info_case_sensitive = Boolean(settings.world_info_case_sensitive);
     if (settings.world_info_match_whole_words !== undefined)
         world_info_match_whole_words = Boolean(settings.world_info_match_whole_words);
     if (settings.world_info_character_strategy !== undefined)
         world_info_character_strategy = Number(settings.world_info_character_strategy);
+    if (settings.world_info_budget_cap !== undefined)
+        world_info_budget_cap = Number(settings.world_info_budget_cap);
 
     // Migrate old settings
     if (world_info_budget > 100) {
@@ -102,11 +124,15 @@ function setWorldInfoSettings(settings, data) {
     $("#world_info_budget").val(world_info_budget);
 
     $("#world_info_recursive").prop('checked', world_info_recursive);
+    $("#world_info_overflow_alert").prop('checked', world_info_overflow_alert);
     $("#world_info_case_sensitive").prop('checked', world_info_case_sensitive);
     $("#world_info_match_whole_words").prop('checked', world_info_match_whole_words);
 
     $(`#world_info_character_strategy option[value='${world_info_character_strategy}']`).prop('selected', true);
     $("#world_info_character_strategy").val(world_info_character_strategy);
+
+    $("#world_info_budget_cap").val(world_info_budget_cap);
+    $("#world_info_budget_cap_counter").text(world_info_budget_cap);
 
     world_names = data.world_names?.length ? data.world_names : [];
 
@@ -276,6 +302,7 @@ function displayWorldEntries(name, data) {
     }
 
     $("#world_popup_entries_list").sortable({
+        delay: getSortableDelay(),
         handle: ".drag-handle",
         stop: async function (event, ui) {
             $('#world_popup_entries_list .world_entry').each(function (index) {
@@ -917,8 +944,14 @@ async function checkWorldInfo(chat, maxContext) {
     let failedProbabilityChecks = new Set();
     let allActivatedText = '';
 
-    const budget = Math.round(world_info_budget * maxContext / 100) || 1;
-    console.debug(`Context size: ${maxContext}; WI budget: ${budget} (${world_info_budget}%)`);
+    let budget = Math.round(world_info_budget * maxContext / 100) || 1;
+
+    if (world_info_budget_cap > 0 && budget > world_info_budget_cap) {
+        console.debug(`Budget ${budget} exceeds cap ${world_info_budget_cap}, using cap`);
+        budget = world_info_budget_cap;
+    }
+
+    console.debug(`Context size: ${maxContext}; WI budget: ${budget} (max% = ${world_info_budget}%, cap = ${world_info_budget_cap})`);
     const sortedEntries = await getSortedEntries();
 
     if (sortedEntries.length === 0) {
@@ -961,18 +994,22 @@ async function checkWorldInfo(chat, maxContext) {
                             console.debug(`uid:${entry.uid}: checking logic: ${entry.selectiveLogic}`)
                             secondary: for (let keysecondary of entry.keysecondary) {
                                 const secondarySubstituted = substituteParams(keysecondary);
-                                console.debug(`uid:${entry.uid}: filtering ${secondarySubstituted}`)
+                                console.debug(`uid:${entry.uid}: filtering ${secondarySubstituted}`);
+
+                                // If selectiveLogic isn't found, assume it's AND
+                                const selectiveLogic = entry.selectiveLogic ?? 0;
+
                                 //AND operator
-                                if (entry.selectiveLogic === 0) {
+                                if (selectiveLogic === 0) {
                                     console.debug('saw AND logic, checking..')
                                     if (secondarySubstituted && matchKeys(textToScan, secondarySubstituted.trim())) {
-                                        console.log(`activating entry ${entry.uid} with AND found`)
+                                        console.debug(`activating entry ${entry.uid} with AND found`)
                                         activatedNow.add(entry);
                                         break secondary;
                                     }
                                 }
                                 //NOT operator
-                                if (entry.selectiveLogic === 1) {
+                                if (selectiveLogic === 1) {
                                     console.debug(`uid ${entry.uid}: checking NOT logic for ${secondarySubstituted}`)
                                     if (secondarySubstituted && matchKeys(textToScan, secondarySubstituted.trim())) {
                                         console.debug(`uid ${entry.uid}: canceled; filtered out by ${secondarySubstituted}`)
@@ -1016,6 +1053,10 @@ async function checkWorldInfo(chat, maxContext) {
 
             if (textToScanTokens + getTokenCount(newContent) >= budget) {
                 console.debug(`WI budget reached, stopping`);
+                if (world_info_overflow_alert) {
+                    console.log("Alerting");
+                    toastr.warning(`World info budget reached after ${count} entries.`, 'World Info');
+                }
                 needsToScan = false;
                 break;
             }
@@ -1089,7 +1130,7 @@ function matchKeys(haystack, needle) {
             return haystack.includes(transformedString);
         }
         else {
-            const regex = new RegExp(`\\b${transformedString}\\b`);
+            const regex = new RegExp(`\\b${escapeRegex(transformedString)}\\b`);
             if (regex.test(haystack)) {
                 return true;
             }
@@ -1246,7 +1287,7 @@ export function checkEmbeddedWorld(chid) {
         const worldName = characters[chid]?.data?.extensions?.world;
         if (!localStorage.getItem(checkKey) && (!worldName || !world_names.includes(worldName))) {
             toastr.info(
-                'To import and use it, select "Import Embedded World Info" in the Options dropdown menu on the character panel.',
+                'To import and use it, select "Import Card Lore" in the "More..." dropdown menu on the character panel.',
                 `${characters[chid].name} has an embedded World/Lorebook`,
                 { timeOut: 10000, extendedTimeOut: 20000, positionClass: 'toast-top-center' },
             );
@@ -1291,7 +1332,6 @@ export async function importEmbeddedWorldInfo() {
 }
 
 function onWorldInfoChange(_, text) {
-    let selectedWorlds;
     if (_ !== '__notSlashCommand__') { // if it's a slash command
         if (text !== undefined) { // and args are provided
             const slashInputSplitText = text.trim().toLowerCase().split(",");
@@ -1299,12 +1339,14 @@ function onWorldInfoChange(_, text) {
             slashInputSplitText.forEach((worldName) => {
                 const wiElement = getWIElement(worldName);
                 if (wiElement.length > 0) {
+                    selected_world_info.push(wiElement.text());
                     wiElement.prop("selected", true);
                     toastr.success(`Activated world: ${wiElement.text()}`);
                 } else {
                     toastr.error(`No world found named: ${worldName}`);
                 }
-            })
+            });
+            $("#world_info").trigger("change");
         } else { // if no args, unset all worlds
             toastr.success('Deactivated all worlds');
             selected_world_info = [];
@@ -1329,6 +1371,7 @@ function onWorldInfoChange(_, text) {
     }
 
     saveSettingsDebounced();
+    eventSource.emit(event_types.WORLDINFO_SETTINGS_UPDATED);
 }
 
 export async function importWorldInfo(file) {
@@ -1465,36 +1508,52 @@ jQuery(() => {
         }
     });
 
+    const saveSettings = () => {
+        saveSettingsDebounced()
+        eventSource.emit(event_types.WORLDINFO_SETTINGS_UPDATED);
+    }
+
     $(document).on("input", "#world_info_depth", function () {
         world_info_depth = Number($(this).val());
         $("#world_info_depth_counter").text($(this).val());
-        saveSettingsDebounced();
+        saveSettings();
     });
 
     $(document).on("input", "#world_info_budget", function () {
         world_info_budget = Number($(this).val());
         $("#world_info_budget_counter").text($(this).val());
-        saveSettingsDebounced();
+        saveSettings();
     });
 
     $(document).on("input", "#world_info_recursive", function () {
         world_info_recursive = !!$(this).prop('checked');
-        saveSettingsDebounced();
+        saveSettings();
     })
 
     $('#world_info_case_sensitive').on('input', function () {
         world_info_case_sensitive = !!$(this).prop('checked');
-        saveSettingsDebounced();
+        saveSettings();
     })
 
     $('#world_info_match_whole_words').on('input', function () {
         world_info_match_whole_words = !!$(this).prop('checked');
-        saveSettingsDebounced();
+        saveSettings();
     });
 
     $('#world_info_character_strategy').on('change', function () {
         world_info_character_strategy = $(this).val();
+        saveSettings();
+    });
+
+    $('#world_info_overflow_alert').on('change', function () {
+        world_info_overflow_alert = !!$(this).prop('checked');
         saveSettingsDebounced();
+    });
+
+    $('#world_info_budget_cap').on('input', function () {
+        world_info_budget_cap = Number($(this).val());
+        $("#world_info_budget_cap_counter").text(world_info_budget_cap);
+        saveSettings();
     });
 
     $('#world_button').on('click', async function () {

@@ -13,7 +13,16 @@ import {
     menu_type,
     max_context,
     saveSettingsDebounced,
+    eventSource,
+    active_group,
+    active_character,
+    setActiveGroup,
+    setActiveCharacter,
 } from "../script.js";
+
+import {
+    characterStatsHandler,
+} from "./stats.js";
 
 
 import {
@@ -103,6 +112,37 @@ function waitForElement(querySelector, timeout) {
         }, timeout);
     });
 }
+
+/**
+ * Converts generation time from milliseconds to a human-readable format.
+ *
+ * The function takes total generation time as an input, then converts it to a format
+ * of "_ Days, _ Hours, _ Minutes, _ Seconds". If the generation time does not exceed a
+ * particular measure (like days or hours), that measure will not be included in the output.
+ *
+ * @param {number} total_gen_time - The total generation time in milliseconds.
+ * @returns {string} - A human-readable string that represents the time spent generating characters.
+ */
+export function humanizeGenTime(total_gen_time) {
+
+    //convert time_spent to humanized format of "_ Hours, _ Minutes, _ Seconds" from milliseconds
+    let time_spent = total_gen_time || 0;
+    time_spent = Math.floor(time_spent / 1000);
+    let seconds = time_spent % 60;
+    time_spent = Math.floor(time_spent / 60);
+    let minutes = time_spent % 60;
+    time_spent = Math.floor(time_spent / 60);
+    let hours = time_spent % 24;
+    time_spent = Math.floor(time_spent / 24);
+    let days = time_spent;
+    time_spent = "";
+    if (days > 0) { time_spent += `${days} Days, `; }
+    if (hours > 0) { time_spent += `${hours} Hours, `; }
+    if (minutes > 0) { time_spent += `${minutes} Minutes, `; }
+    time_spent += `${seconds} Seconds`;
+    return time_spent;
+}
+
 
 
 // Device detection
@@ -204,7 +244,6 @@ $("#rm_ch_create_block").on("input", function () { countTokensDebounced(); });
 $("#character_popup").on("input", function () { countTokensDebounced(); });
 //function:
 export function RA_CountCharTokens() {
-    $("#result_info").html("");
     //console.log('RA_TC -- starting with this_chid = ' + this_chid);
     if (menu_type === "create") {            //if new char
         function saveFormVariables() {
@@ -270,10 +309,14 @@ export function RA_CountCharTokens() {
             // if neither, probably safety char or some error in loading
         } else { console.debug("RA_TC -- no valid char found, closing."); }
     }
+    //label rm_stats_button with a tooltip indicating stats
+    $("#result_info").html(`<small>${count_tokens} Tokens (${perm_tokens} Permanent)</small>
+
+    <i title='Click for stats!' class="fa-solid fa-circle-info rm_stats_button"></i>`);
     // display the counted tokens
     const tokenLimit = Math.max(((main_api !== 'openai' ? max_context : oai_settings.openai_max_context) / 2), 1024);
     if (count_tokens < tokenLimit && perm_tokens < tokenLimit) {
-        $("#result_info").html(`<small>${count_tokens} Tokens (${perm_tokens} Permanent)</small>`);
+
     } else {
         $("#result_info").html(`
         <div class="flex-container alignitemscenter">
@@ -281,16 +324,32 @@ export function RA_CountCharTokens() {
                 <small class="flex-container flexnowrap flexNoGap">
                     <div class="neutral_warning">${count_tokens}</div>&nbsp;Tokens (<div class="neutral_warning">${perm_tokens}</div><div>&nbsp;Permanent)</div>
                 </small>
+                <i title='Click for stats!' class="fa-solid fa-circle-info rm_stats_button"></i>
             </div>
             <div id="chartokenwarning" class="menu_button margin0 whitespacenowrap"><a href="https://docs.sillytavern.app/usage/core-concepts/characterdesign/#character-tokens" target="_blank">About Token 'Limits'</a></div>
         </div>`);
+
+
     } //warn if either are over 1024
+    $(".rm_stats_button").on('click', function () {
+        characterStatsHandler(characters, this_chid);
+    });
 }
-//Auto Load Last Charcter -- (fires when active_character is defined and auto_load_chat is true)
+/**
+ * Auto load chat with the last active character or group.
+ * Fires when active_character is defined and auto_load_chat is true.
+ * The function first tries to find a character with a specific ID from the global settings.
+ * If it doesn't exist, it tries to find a group with a specific grid from the global settings.
+ * If the character list hadn't been loaded yet, it calls itself again after 100ms delay.
+ * The character or group is selected (clicked) if it is found.
+ */
 async function RA_autoloadchat() {
     if (document.getElementById('CharID0') !== null) {
-        var charToAutoLoad = document.getElementById('CharID' + LoadLocal('ActiveChar'));
-        let groupToAutoLoad = document.querySelector(`.group_select[grid="${LoadLocal('ActiveGroup')}"]`);
+        // active character is the name, we should look it up in the character list and get the id
+        let active_character_id = Object.keys(characters).find(key => characters[key].avatar === active_character);
+
+        var charToAutoLoad = document.getElementById('CharID' + active_character_id);
+        let groupToAutoLoad = document.querySelector(`.group_select[grid="${active_group}"]`);
         if (charToAutoLoad != null) {
             $(charToAutoLoad).click();
         }
@@ -298,7 +357,7 @@ async function RA_autoloadchat() {
             $(groupToAutoLoad).click();
         }
 
-        // if the charcter list hadn't been loaded yet, try again.
+        // if the character list hadn't been loaded yet, try again.
     } else { setTimeout(RA_autoloadchat, 100); }
 }
 
@@ -322,6 +381,7 @@ export async function favsToHotswap() {
             thisHotSwapSlot.attr('grid', isGroup ? grid : '');
             thisHotSwapSlot.attr('chid', isCharacter ? chid : '');
             thisHotSwapSlot.data('id', isGroup ? grid : chid);
+            thisHotSwapSlot.attr('title', '');
 
             if (isGroup) {
                 const group = groups.find(x => x.id === grid);
@@ -403,18 +463,13 @@ function RA_autoconnect(PrevApi) {
                 }
                 break;
             case 'openai':
-                if ((secret_state[SECRET_KEYS.OPENAI] && oai_settings.chat_completion_source == chat_completion_sources.OPENAI)
-                    || (secret_state[SECRET_KEYS.CLAUDE] && oai_settings.chat_completion_source == chat_completion_sources.CLAUDE)
+                if (((secret_state[SECRET_KEYS.OPENAI] || oai_settings.reverse_proxy) && oai_settings.chat_completion_source == chat_completion_sources.OPENAI)
+                    || ((secret_state[SECRET_KEYS.CLAUDE] || oai_settings.reverse_proxy) && oai_settings.chat_completion_source == chat_completion_sources.CLAUDE)
                     || (secret_state[SECRET_KEYS.SCALE] && oai_settings.chat_completion_source == chat_completion_sources.SCALE)
                     || (oai_settings.chat_completion_source == chat_completion_sources.WINDOWAI)
                     || (secret_state[SECRET_KEYS.OPENROUTER] && oai_settings.chat_completion_source == chat_completion_sources.OPENROUTER)
                 ) {
                     $("#api_button_openai").click();
-                }
-                break;
-            case 'poe':
-                if (secret_state[SECRET_KEYS.POE]) {
-                    $("#poe_connect").click();
                 }
                 break;
         }
@@ -481,12 +536,14 @@ export function dragElement(elmnt) {
 
     if (elmntHeader.length) {
         elmntHeader.off('mousedown').on('mousedown', (e) => {
-
+            hasBeenDraggedByUser = true
+            observer.observe(elmnt.get(0), { attributes: true, attributeFilter: ['style'] });
             dragMouseDown(e);
         });
-        $(elmnt).off('mousedown').on('mousedown', () => { isMouseDown = true })
-    } else {
-        elmnt.off('mousedown').on('mousedown', dragMouseDown);
+        $(elmnt).off('mousedown').on('mousedown', () => {
+            isMouseDown = true
+            observer.observe(elmnt.get(0), { attributes: true, attributeFilter: ['style'] });
+        })
     }
 
     const observer = new MutationObserver((mutations) => {
@@ -565,7 +622,7 @@ export function dragElement(elmnt) {
             }
 
             //prevent resizing from top left into the top bar
-            if (top <= 40 && maxX >= topBarFirstX && left <= topBarFirstX
+            if (top < 40 && maxX >= topBarFirstX && left <= topBarFirstX
             ) {
                 console.debug('prevent topbar underlap resize')
                 elmnt.css('width', width - 1 + "px");
@@ -620,8 +677,6 @@ export function dragElement(elmnt) {
             elmnt.off('mousedown').on('mousedown', dragMouseDown);
         }
     });
-
-    observer.observe(elmnt.get(0), { attributes: true, attributeFilter: ['style'] });
 
     function dragMouseDown(e) {
 
@@ -692,9 +747,9 @@ export function dragElement(elmnt) {
         $("body").css("overflow", "");
         // Clear the "data-dragged" attribute
         elmnt.attr('data-dragged', 'false');
+        observer.disconnect()
         console.debug(`Saving ${elmntName} UI position`)
         saveSettingsDebounced();
-
     }
 }
 
@@ -864,15 +919,21 @@ $("document").ready(function () {
     $("#rm_button_characters").click(function () { SaveLocal('SelectedNavTab', 'rm_button_characters'); });
 
     // when a char is selected from the list, save them as the auto-load character for next page load
+
+    // when a char is selected from the list, save their name as the auto-load character for next page load
     $(document).on("click", ".character_select", function () {
-        SaveLocal('ActiveChar', $(this).attr('chid'));
-        SaveLocal('ActiveGroup', null);
+        setActiveCharacter($(this).find('.avatar').attr('title'));
+        setActiveGroup(null);
+        saveSettingsDebounced();
     });
 
     $(document).on("click", ".group_select", function () {
-        SaveLocal('ActiveChar', null);
-        SaveLocal('ActiveGroup', $(this).data('id'));
+        setActiveCharacter(null);
+        setActiveGroup($(this).data('id'));
+        saveSettingsDebounced();
     });
+
+
 
     //this makes the chat input text area resize vertically to match the text size (limited by CSS at 50% window height)
     $('#send_textarea').on('input', function () {
@@ -926,6 +987,12 @@ $("document").ready(function () {
             if (!event.shiftKey && !event.ctrlKey && event.key == "Enter" && is_send_press == false && sendOnEnter) {
                 event.preventDefault();
                 Generate();
+            }
+        }
+        if ($(':focus').attr('id') === 'dialogue_popup_input' && !isMobile()) {
+            if (!event.shiftKey && !event.ctrlKey && event.key == "Enter") {
+                event.preventDefault();
+                $('#dialogue_popup_ok').trigger('click');
             }
         }
         //ctrl+shift+up to scroll to context line
@@ -989,11 +1056,10 @@ $("document").ready(function () {
         }
 
         if (event.ctrlKey && event.key == "ArrowUp") { //edits last USER message if chatbar is empty and focused
-            console.debug('got ctrl+uparrow input');
             if (
                 $("#send_textarea").val() === '' &&
                 chatbarInFocus === true &&
-                $(".swipe_right:last").css('display') === 'flex' &&
+                ($(".swipe_right:last").css('display') === 'flex' || $('.last_mes').attr('is_system') === 'true') &&
                 $("#character_popup").css("display") === "none" &&
                 $("#shadow_select_chat_popup").css("display") === "none"
             ) {
@@ -1001,7 +1067,7 @@ $("document").ready(function () {
                 const lastIsUserMes = isUserMesList[isUserMesList.length - 1];
                 const editMes = lastIsUserMes.querySelector('.mes_block .mes_edit');
                 if (editMes !== null) {
-                    $(editMes).click();
+                    $(editMes).trigger('click');
                 }
             }
         }
@@ -1021,6 +1087,81 @@ $("document").ready(function () {
                     $(editMes).click();
                 }
             }
+        }
+
+        if (event.key == "Escape") { //closes various panels
+            //dont override Escape hotkey functions from script.js
+            //"close edit box" and "cancel stream generation".
+
+            if ($("#curEditTextarea").is(":visible") || $("#mes_stop").is(":visible")) {
+                console.debug('escape key, but deferring to script.js routines')
+                return
+            }
+
+            if ($("#dialogue_popup").is(":visible")) {
+                if ($("#dialogue_popup_cancel").is(":visible")) {
+                    $("#dialogue_popup_cancel").trigger('click');
+                    return
+                } else {
+                    $("#dialogue_popup_ok").trigger('click')
+                    return
+                }
+            }
+
+            if ($("#select_chat_popup").is(":visible")) {
+                $("#select_chat_cross").trigger('click');
+                return
+            }
+
+            if ($("#character_popup").is(":visible")) {
+                $("#character_cross").trigger('click');
+                return
+            }
+
+            if ($(".drawer-content")
+                .not('#WorldInfo')
+                .not('#left-nav-panel')
+                .not('#right-nav-panel')
+                .not('#floatingPrompt')
+                .is(":visible")) {
+                let visibleDrawerContent = $(".drawer-content:visible")
+                    .not('#WorldInfo')
+                    .not('#left-nav-panel')
+                    .not('#right-nav-panel')
+                    .not('#floatingPrompt')
+                console.log(visibleDrawerContent)
+                $(visibleDrawerContent).parent().find('.drawer-icon').trigger('click');
+                return
+            }
+
+            if ($("#floatingPrompt").is(":visible")) {
+                console.log('saw AN visible, trying to close')
+                $("#ANClose").trigger('click');
+                return
+            }
+
+            if ($("#WorldInfo").is(":visible")) {
+                $("#WIDrawerIcon").trigger('click');
+                return
+            }
+
+            if ($("#left-nav-panel").is(":visible") &&
+                $(LPanelPin).prop('checked') === false) {
+                $("#leftNavDrawerIcon").trigger('click');
+                return
+            }
+
+            if ($("#right-nav-panel").is(":visible") &&
+                $(RPanelPin).prop('checked') === false) {
+                $("#rightNavDrawerIcon").trigger('click');
+                return
+            }
+        }
+
+        if (event.ctrlKey && /^[1-9]$/.test(event.key)) {
+            // Your code here
+            event.preventDefault();
+            console.log("Ctrl +" + event.key + " pressed!");
         }
     }
 });

@@ -9,10 +9,15 @@ public/worlds/
 public/css/bg_load.css
 public/themes/
 public/OpenAI Settings/
+public/KoboldAI Settings/
+public/NovelAI Settings/
+public/TextGen Settings/
 public/scripts/extensions/third-party/
+public/stats.json
 /uploads/
 *.jsonl
-config.conf
+/config.conf
+/docker/config
 .DS_Store
 public/settings.json
 /thumbnails
@@ -20,7 +25,8 @@ whitelist.txt
 .vscode
 secrets.json
 /dist
-poe_device.json
 /backups/
-poe-error.log
-poe-success.log
+public/movingUI/
+public/QuickReplies/
+content.log
+cloudflared.exe

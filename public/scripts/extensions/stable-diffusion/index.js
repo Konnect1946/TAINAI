@@ -8,10 +8,13 @@ import {
     getRequestHeaders,
     event_types,
     eventSource,
-    appendImageToMessage
+    appendImageToMessage,
+    generateQuietPrompt,
+    this_chid,
 } from "../../../script.js";
 import { getApiUrl, getContext, extension_settings, doExtrasFetch, modules } from "../../extensions.js";
-import { stringFormat, initScrollHeight, resetScrollHeight, timestampToMoment } from "../../utils.js";
+import { selected_group } from "../../group-chats.js";
+import { stringFormat, initScrollHeight, resetScrollHeight, timestampToMoment, getCharaFilename } from "../../utils.js";
 export { MODULE_NAME };
 
 // Wraps a string into monospace font-face span
@@ -37,6 +40,17 @@ const generationMode = {
     NOW: 4,
     FACE: 5,
     FREE: 6,
+    BACKGROUND: 7,
+}
+
+const modeLabels = {
+    [generationMode.CHARACTER]: 'Character ("Yourself")',
+    [generationMode.FACE]: 'Portrait ("Your Face")',
+    [generationMode.USER]: 'User ("Me")',
+    [generationMode.SCENARIO]: 'Scenario ("The Whole Story")',
+    [generationMode.NOW]: 'Last Message',
+    [generationMode.RAW_LAST]: 'Raw Last Message',
+    [generationMode.BACKGROUND]: 'Background',
 }
 
 const triggerWords = {
@@ -46,9 +60,10 @@ const triggerWords = {
     [generationMode.RAW_LAST]: ['raw_last'],
     [generationMode.NOW]: ['last'],
     [generationMode.FACE]: ['face'],
+    [generationMode.BACKGROUND]: ['background'],
 }
 
-const quietPrompts = {
+const promptTemplates = {
     /*OLD:     [generationMode.CHARACTER]: "Pause your roleplay and provide comma-delimited list of phrases and keywords which describe {{char}}'s physical appearance and clothing. Ignore {{char}}'s personality traits, and chat history when crafting this description. End your response once the comma-delimited list is complete. Do not roleplay when writing this description, and do not attempt to continue the story.", */
     [generationMode.CHARACTER]: "[In the next response I want you to provide only a detailed comma-delimited list of keywords and phrases which describe {{char}}. The list must include all of the following items in this order: name, species and race, gender, age, clothing, occupation, physical features and appearances. Do not include descriptions of non-visual qualities such as personality, movements, scents, mental traits, or anything which could not be seen in a still photograph. Do not write in full sentences. Prefix your description with the phrase 'full body portrait,']",
     //face-specific prompt
@@ -82,6 +97,7 @@ const quietPrompts = {
     '(location),(character list by gender),(primary action), (relative character position) POV, (character 1's description and actions), (character 2's description and actions)']`,
 
     [generationMode.RAW_LAST]: "[Pause your roleplay and provide ONLY the last chat message string back to me verbatim. Do not write anything after the string. Do not roleplay at all in your response. Do not continue the roleplay story.]",
+    [generationMode.BACKGROUND]: "[Pause your roleplay and provide a detailed description of {{char}}'s surroundings in the form of a comma-delimited list of keywords and phrases. The list must include all of the following items in this order: location, time of day, weather, lighting, and any other relevant details. Do not include descriptions of characters and non-visual qualities such as names, personality, movements, scents, mental traits, or anything which could not be seen in a still photograph. Do not write in full sentences. Prefix your description with the phrase 'background,'. Ignore the rest of the story when crafting this description. Do not roleplay as {{user}} when writing this description, and do not attempt to continue the story.]",
 }
 
 const helpString = [
@@ -93,6 +109,7 @@ const helpString = [
     `<li>${m(j(triggerWords[generationMode.SCENARIO]))} – visual recap of the whole chat scenario</li>`,
     `<li>${m(j(triggerWords[generationMode.NOW]))} – visual recap of the last chat message</li>`,
     `<li>${m(j(triggerWords[generationMode.RAW_LAST]))} – visual recap of the last chat message with no summary</li>`,
+    `<li>${m(j(triggerWords[generationMode.BACKGROUND]))} – generate a background for this chat based on the chat's context</li>`,
     '</ul>',
     `Anything else would trigger a "free mode" to make SD generate whatever you prompted.<Br>
     example: '/sd apple tree' would generate a picture of an apple tree.`,
@@ -134,11 +151,28 @@ const defaultSettings = {
 
     // Refine mode
     refine_mode: false,
+
+    prompts: promptTemplates,
 }
 
 async function loadSettings() {
     if (Object.keys(extension_settings.sd).length === 0) {
         Object.assign(extension_settings.sd, defaultSettings);
+    }
+
+    if (extension_settings.sd.prompts === undefined) {
+        extension_settings.sd.prompts = promptTemplates;
+    }
+
+    // Insert missing templates
+    for (const [key, value] of Object.entries(promptTemplates)) {
+        if (extension_settings.sd.prompts[key] === undefined) {
+            extension_settings.sd.prompts[key] = value;
+        }
+    }
+
+    if (extension_settings.sd.character_prompts === undefined) {
+        extension_settings.sd.character_prompts = {};
     }
 
     $('#sd_scale').val(extension_settings.sd.scale).trigger('input');
@@ -154,7 +188,102 @@ async function loadSettings() {
     $('#sd_enable_hr').prop('checked', extension_settings.sd.enable_hr);
     $('#sd_refine_mode').prop('checked', extension_settings.sd.refine_mode);
 
+    addPromptTemplates();
+
     await Promise.all([loadSamplers(), loadModels()]);
+}
+
+function addPromptTemplates() {
+    $('#sd_prompt_templates').empty();
+
+    for (const [name, prompt] of Object.entries(extension_settings.sd.prompts)) {
+        const label = $('<label></label>')
+            .text(modeLabels[name])
+            .attr('for', `sd_prompt_${name}`);
+        const textarea = $('<textarea></textarea>')
+            .addClass('textarea_compact text_pole')
+            .attr('id', `sd_prompt_${name}`)
+            .attr('rows', 6)
+            .val(prompt).on('input', () => {
+                extension_settings.sd.prompts[name] = textarea.val();
+                saveSettingsDebounced();
+            });
+        const button = $('<button></button>')
+            .addClass('menu_button fa-solid fa-undo')
+            .attr('title', 'Restore default')
+            .on('click', () => {
+                textarea.val(promptTemplates[name]);
+                extension_settings.sd.prompts[name] = promptTemplates[name];
+                saveSettingsDebounced();
+            });
+        const container = $('<div></div>')
+            .addClass('title_restorable')
+            .append(label)
+            .append(button)
+        $('#sd_prompt_templates').append(container);
+        $('#sd_prompt_templates').append(textarea);
+    }
+}
+
+async function refinePrompt(prompt) {
+    if (extension_settings.sd.refine_mode) {
+        const refinedPrompt = await callPopup('<h3>Review and edit the prompt:</h3>Press "Cancel" to abort the image generation.', 'input', prompt, { rows: 5, okButton: 'Generate' });
+
+        if (refinedPrompt) {
+            return refinedPrompt;
+        } else {
+            throw new Error('Generation aborted by user.');
+        }
+    }
+
+    return prompt;
+}
+
+function onChatChanged() {
+    if (this_chid === undefined || selected_group) {
+        $('#sd_character_prompt_block').hide();
+        return;
+    }
+
+    $('#sd_character_prompt_block').show();
+    const key = getCharaFilename(this_chid);
+    $('#sd_character_prompt').val(key ? (extension_settings.sd.character_prompts[key] || '') : '');
+}
+
+function onCharacterPromptInput() {
+    const key = getCharaFilename(this_chid);
+    extension_settings.sd.character_prompts[key] = $('#sd_character_prompt').val();
+    resetScrollHeight($(this));
+    saveSettingsDebounced();
+}
+
+function getCharacterPrefix() {
+    if (selected_group) {
+        return '';
+    }
+
+    const key = getCharaFilename(this_chid);
+
+    if (key) {
+        return extension_settings.sd.character_prompts[key] || '';
+    }
+
+    return '';
+}
+
+function combinePrefixes(str1, str2) {
+    if (!str2) {
+        return str1;
+    }
+
+    // Remove leading/trailing white spaces and commas from the strings
+    str1 = str1.trim().replace(/^,|,$/g, '');
+    str2 = str2.trim().replace(/^,|,$/g, '');
+
+    // Combine the strings with a comma between them
+    var result = `${str1}, ${str2},`;
+
+    return result;
 }
 
 function onRefineModeInput() {
@@ -383,7 +512,7 @@ function getQuietPrompt(mode, trigger) {
         return trigger;
     }
 
-    return substituteParams(stringFormat(quietPrompts[mode], trigger));
+    return substituteParams(stringFormat(extension_settings.sd.prompts[mode], trigger));
 }
 
 function processReply(str) {
@@ -437,8 +566,35 @@ async function generatePicture(_, trigger, message, callback) {
     const context = getContext();
 
     const prevSDHeight = extension_settings.sd.height;
-    if (generationType == generationMode.FACE) {
-        extension_settings.sd.height = extension_settings.sd.width * 1.5;
+    const prevSDWidth = extension_settings.sd.width;
+    const aspectRatio = extension_settings.sd.width / extension_settings.sd.height;
+
+    // Face images are always portrait (pun intended)
+    if (generationType == generationMode.FACE && aspectRatio >= 1) {
+        // Round to nearest multiple of 64
+        extension_settings.sd.height = Math.round(extension_settings.sd.width * 1.5 / 64) * 64;
+    }
+
+    // Background images are always landscape
+    if (generationType == generationMode.BACKGROUND && aspectRatio <= 1) {
+        // Round to nearest multiple of 64
+        extension_settings.sd.width = Math.round(extension_settings.sd.height * 1.8 / 64) * 64;
+        const callbackOriginal = callback;
+        callback = function (prompt, base64Image) {
+            const imgUrl = `url(${base64Image})`;
+            if ('forceSetBackground' in window) {
+                forceSetBackground(imgUrl);
+            } else {
+                toastr.info('Background image will not be preserved.', '"Chat backgrounds" extension is disabled.');
+                $('#bg_custom').css('background-image', imgUrl);
+            }
+
+            if (typeof callbackOriginal === 'function') {
+                callbackOriginal(prompt, base64Image);
+            } else {
+                sendMessage(prompt, base64Image);
+            }
+        }
     }
 
     try {
@@ -448,13 +604,14 @@ async function generatePicture(_, trigger, message, callback) {
         context.deactivateSendButtons();
         hideSwipeButtons();
 
-        await sendGenerationRequest(prompt, callback);
+        await sendGenerationRequest(generationType, prompt, callback);
     } catch (err) {
         console.trace(err);
         throw new Error('SD prompt text generation failed.')
     }
     finally {
         extension_settings.sd.height = prevSDHeight;
+        extension_settings.sd.width = prevSDWidth;
         context.activateSendButtons();
         showSwipeButtons();
     }
@@ -475,43 +632,32 @@ async function getPrompt(generationType, message, trigger, quiet_prompt) {
             break;
     }
 
+    if (generationType !== generationMode.FREE) {
+        prompt = await refinePrompt(prompt);
+    }
+
     return prompt;
 }
 
 async function generatePrompt(quiet_prompt) {
-    let reply = processReply(await new Promise(
-        async function promptPromise(resolve, reject) {
-            try {
-                await getContext().generate('quiet', { resolve, reject, quiet_prompt, force_name2: true, });
-            }
-            catch {
-                reject();
-            }
-        }));
-
-    if (extension_settings.sd.refine_mode) {
-        const refinedPrompt = await callPopup('<h3>Review and edit the generated prompt:</h3>Press "Cancel" to abort the image generation.', 'input', reply, { rows: 5 });
-
-        if (refinedPrompt) {
-            reply = refinedPrompt;
-        } else {
-            throw new Error('Generation aborted by user.');
-        }
-    }
-
-    return reply;
+    const reply = await generateQuietPrompt(quiet_prompt);
+    return processReply(reply);
 }
 
-async function sendGenerationRequest(prompt, callback) {
+async function sendGenerationRequest(generationType, prompt, callback) {
+    const prefix = generationType !== generationMode.BACKGROUND
+        ? combinePrefixes(extension_settings.sd.prompt_prefix, getCharacterPrefix())
+        : extension_settings.sd.prompt_prefix;
+
     if (extension_settings.sd.horde) {
-        await generateHordeImage(prompt, callback);
+        await generateHordeImage(prompt, prefix, callback);
     } else {
-        await generateExtrasImage(prompt, callback);
+        await generateExtrasImage(prompt, prefix, callback);
     }
 }
 
-async function generateExtrasImage(prompt, callback) {
-    console.log(extension_settings.sd);
+async function generateExtrasImage(prompt, prefix, callback) {
+    console.debug(extension_settings.sd);
     const url = new URL(getApiUrl());
     url.pathname = '/api/image';
     const result = await doExtrasFetch(url, {
@@ -524,7 +670,7 @@ async function generateExtrasImage(prompt, callback) {
             scale: extension_settings.sd.scale,
             width: extension_settings.sd.width,
             height: extension_settings.sd.height,
-            prompt_prefix: extension_settings.sd.prompt_prefix,
+            prompt_prefix: prefix,
             negative_prompt: extension_settings.sd.negative_prompt,
             restore_faces: !!extension_settings.sd.restore_faces,
             enable_hr: !!extension_settings.sd.enable_hr,
@@ -541,7 +687,7 @@ async function generateExtrasImage(prompt, callback) {
     }
 }
 
-async function generateHordeImage(prompt, callback) {
+async function generateHordeImage(prompt, prefix, callback) {
     const result = await fetch('/horde_generateimage', {
         method: 'POST',
         headers: getRequestHeaders(),
@@ -552,7 +698,7 @@ async function generateHordeImage(prompt, callback) {
             scale: extension_settings.sd.scale,
             width: extension_settings.sd.width,
             height: extension_settings.sd.height,
-            prompt_prefix: extension_settings.sd.prompt_prefix,
+            prompt_prefix: prefix,
             negative_prompt: extension_settings.sd.negative_prompt,
             model: extension_settings.sd.model,
             nsfw: extension_settings.sd.horde_nsfw,
@@ -577,6 +723,7 @@ async function sendMessage(prompt, image) {
         name: context.groupId ? systemUserName : context.name2,
         is_system: context.groupId ? true : false,
         is_user: false,
+        is_system: true,
         is_name: true,
         send_date: timestampToMoment(Date.now()).format('LL LT'),
         mes: context.groupId ? p(messageText) : messageText,
@@ -612,6 +759,7 @@ function addSDGenButtons() {
             <li class="list-group-item" id="sd_world" data-value="world">The Whole Story</li>
             <li class="list-group-item" id="sd_last" data-value="last">The Last Message</li>
             <li class="list-group-item" id="sd_raw_last" data-value="raw_last">Raw Last Message</li>
+            <li class="list-group-item" id="sd_background" data-value="background">Background</li>
         </ul>
     </div>`;
 
@@ -690,9 +838,11 @@ async function sdMessageButton(e) {
     try {
         setBusyIcon(true);
         if (hasSavedImage) {
-            const prompt = message?.extra?.title;
+            const prompt = await refinePrompt(message.extra.title);
+            message.extra.title = prompt;
+
             console.log('Regenerating an image, using existing prompt:', prompt);
-            await sendGenerationRequest(prompt, saveGeneratedImage);
+            await sendGenerationRequest(generationMode.FREE, prompt, saveGeneratedImage);
         }
         else {
             console.log("doing /sd raw last");
@@ -723,36 +873,22 @@ async function sdMessageButton(e) {
 };
 
 $("#sd_dropdown [id]").on("click", function () {
-    var id = $(this).attr("id");
-    if (id == "sd_you") {
-        console.log("doing /sd you");
-        generatePicture('sd', 'you');
-    }
+    const id = $(this).attr("id");
+    const idParamMap = {
+        "sd_you": "you",
+        "sd_face": "face",
+        "sd_me": "me",
+        "sd_world": "scene",
+        "sd_last": "last",
+        "sd_raw_last": "raw_last",
+        "sd_background": "background"
+    };
 
-    else if (id == "sd_face") {
-        console.log("doing /sd face");
-        generatePicture('sd', 'face');
+    const param = idParamMap[id];
 
-    }
-
-    else if (id == "sd_me") {
-        console.log("doing /sd me");
-        generatePicture('sd', 'me');
-    }
-
-    else if (id == "sd_world") {
-        console.log("doing /sd scene");
-        generatePicture('sd', 'scene');
-    }
-
-    else if (id == "sd_last") {
-        console.log("doing /sd last");
-        generatePicture('sd', 'last');
-    }
-
-    else if (id == "sd_raw_last") {
-        console.log("doing /sd raw last");
-        generatePicture('sd', 'raw_last');
+    if (param) {
+        console.log("doing /sd " + param)
+        generatePicture('sd', param);
     }
 });
 
@@ -763,60 +899,74 @@ jQuery(async () => {
     <div class="sd_settings">
         <div class="inline-drawer">
             <div class="inline-drawer-toggle inline-drawer-header">
-            <b>Stable Diffusion</b>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                <b>Stable Diffusion</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+            </div>
+            <div class="inline-drawer-content">
+                <small><i>Use slash commands or the bottom Paintbrush button to generate images. Type <span class="monospace">/help</span> in chat for more details</i></small>
+                <br>
+                <small><i>Hint: Save an API key in Horde KoboldAI API settings to use it here.</i></small>
+                <label for="sd_refine_mode" class="checkbox_label" title="Allow to edit prompts manually before sending them to generation API">
+                    <input id="sd_refine_mode" type="checkbox" />
+                    Edit prompts before generation
+                </label>
+                <div class="flex-container flexGap5 marginTop10 margin-bot-10px">
+                    <label class="checkbox_label">
+                        <input id="sd_horde" type="checkbox" />
+                        Use Stable Horde
+                    </label>
+                    <label style="margin-left:1em;" class="checkbox_label">
+                        <input id="sd_horde_nsfw" type="checkbox" />
+                        Allow NSFW images from Horde
+                    </label>
+                </div>
+                <label for="sd_scale">CFG Scale (<span id="sd_scale_value"></span>)</label>
+                <input id="sd_scale" type="range" min="${defaultSettings.scale_min}" max="${defaultSettings.scale_max}" step="${defaultSettings.scale_step}" value="${defaultSettings.scale}" />
+                <label for="sd_steps">Sampling steps (<span id="sd_steps_value"></span>)</label>
+                <input id="sd_steps" type="range" min="${defaultSettings.steps_min}" max="${defaultSettings.steps_max}" step="${defaultSettings.steps_step}" value="${defaultSettings.steps}" />
+                <label for="sd_width">Width (<span id="sd_width_value"></span>)</label>
+                <input id="sd_width" type="range" max="${defaultSettings.dimension_max}" min="${defaultSettings.dimension_min}" step="${defaultSettings.dimension_step}" value="${defaultSettings.width}" />
+                <label for="sd_height">Height (<span id="sd_height_value"></span>)</label>
+                <input id="sd_height" type="range" max="${defaultSettings.dimension_max}" min="${defaultSettings.dimension_min}" step="${defaultSettings.dimension_step}" value="${defaultSettings.height}" />
+                <div><small>Only for Horde or remote Stable Diffusion Web UI:</small></div>
+                <div class="flex-container marginTop10 margin-bot-10px">
+                    <label class="flex1 checkbox_label">
+                        <input id="sd_restore_faces" type="checkbox" />
+                        Restore Faces
+                    </label>
+                    <label class="flex1 checkbox_label">
+                        <input id="sd_enable_hr" type="checkbox" />
+                        Hires. Fix
+                    </label>
+                </div>
+                <label for="sd_model">Stable Diffusion model</label>
+                <select id="sd_model"></select>
+                <label for="sd_sampler">Sampling method</label>
+                <select id="sd_sampler"></select>
+                <div class="flex-container flexGap5 margin-bot-10px">
+                    <label class="checkbox_label">
+                        <input id="sd_horde_karras" type="checkbox" />
+                        Karras (only for Horde, not all samplers supported)
+                    </label>
+                </div>
+                <label for="sd_prompt_prefix">Common prompt prefix</label>
+                <textarea id="sd_prompt_prefix" class="text_pole textarea_compact" rows="3"></textarea>
+                <div id="sd_character_prompt_block">
+                    <label for="sd_character_prompt">Character-specific prompt prefix</label>
+                    <small>Won't be used in groups.</small>
+                    <textarea id="sd_character_prompt" class="text_pole textarea_compact" rows="3" placeholder="Any characteristics that describe the currently selected character. Will be added after a common prefix.&#10;Example: female, green eyes, brown hair, pink shirt"></textarea>
+                </div>
+                <label for="sd_negative_prompt">Negative prompt</label>
+                <textarea id="sd_negative_prompt" class="text_pole textarea_compact" rows="3"></textarea>
+            </div>
         </div>
-        <div class="inline-drawer-content">
-            <small><i>Use slash commands or the bottom Paintbrush button to generate images. Type <span class="monospace">/help</span> in chat for more details</i></small>
-            <br>
-            <small><i>Hint: Save an API key in Horde KoboldAI API settings to use it here.</i></small>
-            <label for="sd_refine_mode" class="checkbox_label" title="Allow to edit prompts manually before sending them to generation API">
-                <input id="sd_refine_mode" type="checkbox" />
-                Edit prompts before generation
-            </label>
-            <div class="flex-container flexGap5 marginTop10 margin-bot-10px">
-                <label class="checkbox_label">
-                    <input id="sd_horde" type="checkbox" />
-                    Use Stable Horde
-                </label>
-                <label style="margin-left:1em;" class="checkbox_label">
-                    <input id="sd_horde_nsfw" type="checkbox" />
-                    Allow NSFW images from Horde
-                </label>
+        <div class="inline-drawer">
+            <div class="inline-drawer-toggle inline-drawer-header">
+                <b>SD Prompt Templates</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
-            <label for="sd_scale">CFG Scale (<span id="sd_scale_value"></span>)</label>
-            <input id="sd_scale" type="range" min="${defaultSettings.scale_min}" max="${defaultSettings.scale_max}" step="${defaultSettings.scale_step}" value="${defaultSettings.scale}" />
-            <label for="sd_steps">Sampling steps (<span id="sd_steps_value"></span>)</label>
-            <input id="sd_steps" type="range" min="${defaultSettings.steps_min}" max="${defaultSettings.steps_max}" step="${defaultSettings.steps_step}" value="${defaultSettings.steps}" />
-            <label for="sd_width">Width (<span id="sd_width_value"></span>)</label>
-            <input id="sd_width" type="range" max="${defaultSettings.dimension_max}" min="${defaultSettings.dimension_min}" step="${defaultSettings.dimension_step}" value="${defaultSettings.width}" />
-            <label for="sd_height">Height (<span id="sd_height_value"></span>)</label>
-            <input id="sd_height" type="range" max="${defaultSettings.dimension_max}" min="${defaultSettings.dimension_min}" step="${defaultSettings.dimension_step}" value="${defaultSettings.height}" />
-            <div><small>Only for Horde or remote Stable Diffusion Web UI:</small></div>
-            <div class="flex-container marginTop10 margin-bot-10px">
-                <label class="flex1 checkbox_label">
-                    <input id="sd_restore_faces" type="checkbox" />
-                    Restore Faces
-                </label>
-                <label class="flex1 checkbox_label">
-                    <input id="sd_enable_hr" type="checkbox" />
-                    Hires. Fix
-                </label>
+            <div id="sd_prompt_templates" class="inline-drawer-content">
             </div>
-            <label for="sd_model">Stable Diffusion model</label>
-            <select id="sd_model"></select>
-            <label for="sd_sampler">Sampling method</label>
-            <select id="sd_sampler"></select>
-            <div class="flex-container flexGap5 margin-bot-10px">
-                <label class="checkbox_label">
-                    <input id="sd_horde_karras" type="checkbox" />
-                    Karras (only for Horde, not all samplers supported)
-                </label>
-            </div>
-            <label for="sd_prompt_prefix">Generated prompt prefix</label>
-            <textarea id="sd_prompt_prefix" class="text_pole textarea_compact" rows="2"></textarea>
-            <label for="sd_negative_prompt">Negative prompt</label>
-            <textarea id="sd_negative_prompt" class="text_pole textarea_compact" rows="2"></textarea>
         </div>
     </div>`;
 
@@ -835,15 +985,20 @@ jQuery(async () => {
     $('#sd_restore_faces').on('input', onRestoreFacesInput);
     $('#sd_enable_hr').on('input', onHighResFixInput);
     $('#sd_refine_mode').on('input', onRefineModeInput);
+    $('#sd_character_prompt').on('input', onCharacterPromptInput);
+    $('#sd_character_prompt_block').hide();
 
     $('.sd_settings .inline-drawer-toggle').on('click', function () {
         initScrollHeight($("#sd_prompt_prefix"));
         initScrollHeight($("#sd_negative_prompt"));
+        initScrollHeight($("#sd_character_prompt"));
     })
 
     eventSource.on(event_types.EXTRAS_CONNECTED, async () => {
         await Promise.all([loadSamplers(), loadModels()]);
     });
+
+    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
 
     await loadSettings();
     $('body').addClass('sd');

@@ -1,6 +1,4 @@
 {
-    "max_length": 100,
-    "genamt": 100,
     "temp": 1,
     "top_k": 0,
     "top_p": 0.95,

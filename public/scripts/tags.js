@@ -10,6 +10,7 @@ import {
 } from "../script.js";
 
 import { selected_group } from "./group-chats.js";
+import { uuidv4 } from "./utils.js";
 
 export {
     tags,
@@ -24,7 +25,7 @@ export {
     importTags,
 };
 
-const random_id = () => Math.round(Date.now() * Math.random()).toString();
+const random_id = () => uuidv4();
 const TAG_LOGIC_AND = true; // switch to false to use OR logic for combining tags
 const CHARACTER_SELECTOR = '#rm_print_characters_block > div';
 const GROUP_MEMBER_SELECTOR = '#rm_group_add_members > div';
@@ -311,7 +312,7 @@ function appendTagToList(listElement, tag, { removable, selectable, action, isGe
     }
 
     if (tag.excluded) {
-        isGeneralList ? $(tagElement).addClass('excluded') : $(listElement).parent().parent().addClass('hiddenByTag');
+        isGeneralList ? $(tagElement).addClass('excluded') : $(listElement).closest('.character_select, .group_select').addClass('hiddenByTag');
     }
 
     if (selectable) {
@@ -329,7 +330,7 @@ function appendTagToList(listElement, tag, { removable, selectable, action, isGe
     $(listElement).append(tagElement);
 }
 
-function onTagFilterClick(listElement, characterSelector) { 
+function onTagFilterClick(listElement, characterSelector) {
     let excludeTag;
     if ($(this).hasClass('selected')) {
         $(this).removeClass('selected');
@@ -499,7 +500,7 @@ function onViewTagsListClick() {
     $(list).append('<h3>Tags</h3><i>Click on the tag name to edit it.</i><br>');
     $(list).append('<i>Click on color box to assign new color.</i><br><br>');
 
-    for (const tag of tags) {
+    for (const tag of tags.slice().sort((a, b) => a?.name?.localeCompare(b?.name))) {
         const count = everything.filter(x => x == tag.id).length;
         const template = $('#tag_view_template .tag_view_item').clone();
         template.attr('id', tag.id);

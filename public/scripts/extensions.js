@@ -53,12 +53,17 @@ const extension_settings = {
         chara: [],
         wiAddition: [],
     },
-    caption: {},
+    caption: {
+        refine_mode: false,
+    },
     expressions: {},
     dice: {},
     regex: [],
     tts: {},
-    sd: {},
+    sd: {
+        prompts: {},
+        character_prompts: {},
+    },
     chromadb: {},
     translate: {},
     objective: {},
@@ -68,6 +73,8 @@ const extension_settings = {
         fluctuation: 0.1,
         enabled: false,
     },
+    speech_recognition: {},
+    rvc: {},
 };
 
 let modules = [];
@@ -165,6 +172,8 @@ async function getManifests(names) {
                     const json = await response.json();
                     obj[name] = json;
                     resolve();
+                } else {
+                    reject();
                 }
             }).catch(err => reject() && console.log('Could not load manifest.json for ' + name, err));
         });
@@ -411,9 +420,9 @@ async function generateExtensionHtml(name, manifest, isActive, isDisabled, isExt
     let toggleElement = isActive || isDisabled ?
         `<input type="checkbox" title="Click to toggle" data-name="${name}" class="${isActive ? 'toggle_disable' : 'toggle_enable'} ${checkboxClass}" ${isActive ? 'checked' : ''}>` :
         `<input type="checkbox" title="Cannot enable extension" data-name="${name}" class="extension_missing ${checkboxClass}" disabled>`;
-    
+
     let deleteButton = isExternal ? `<span class="delete-button"><button class="btn_delete menu_button" data-name="${name.replace('third-party', '')}" title="Delete"><i class="fa-solid fa-trash-can"></i></button></span>` : '';
-    
+
     // if external, wrap the name in a link to the repo
 
     let extensionHtml = `<hr>
@@ -423,7 +432,7 @@ async function generateExtensionHtml(name, manifest, isActive, isDisabled, isExt
             ${originHtml}
             <span class="${isActive ? "extension_enabled" : isDisabled ? "extension_disabled" : "extension_missing"}">
                 ${DOMPurify.sanitize(displayName)}${displayVersion}
-            </span> 
+            </span>
             ${isExternal ? '</a>' : ''}
 
             <span style="float:right;">${toggleElement}</span>

@@ -1,19 +1,21 @@
 import { callPopup, cancelTtsPlay, eventSource, event_types, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
-import { ModuleWorkerWrapper, extension_settings, getContext } from '../../extensions.js'
+import { ModuleWorkerWrapper, doExtrasFetch, extension_settings, getApiUrl, getContext, modules } from '../../extensions.js'
 import { escapeRegex, getStringHash } from '../../utils.js'
 import { EdgeTtsProvider } from './edge.js'
 import { ElevenLabsTtsProvider } from './elevenlabs.js'
 import { SileroTtsProvider } from './silerotts.js'
+import { CoquiTtsProvider } from './coqui.js'
 import { SystemTtsProvider } from './system.js'
 import { NovelTtsProvider } from './novel.js'
-import { isMobile } from '../../RossAscends-mods.js'
 import { power_user } from '../../power-user.js'
+import { rvcVoiceConversion } from "../rvc/index.js"
+export { talkingAnimation };
 
 const UPDATE_INTERVAL = 1000
 
 let voiceMap = {} // {charName:voiceid, charName2:voiceid2}
 let audioControl
-
+let storedvalue = false;
 let lastCharacterId = null
 let lastGroupId = null
 let lastChatId = null
@@ -64,6 +66,7 @@ let ttsProviders = {
     ElevenLabs: ElevenLabsTtsProvider,
     Silero: SileroTtsProvider,
     System: SystemTtsProvider,
+    Coqui: CoquiTtsProvider,
     Edge: EdgeTtsProvider,
     Novel: NovelTtsProvider,
 }
@@ -162,6 +165,26 @@ async function moduleWorker() {
     ttsJobQueue.push(message)
 }
 
+function talkingAnimation(switchValue) {
+    if (!modules.includes('talkinghead')) {
+        console.debug("Talking Animation module not loaded");
+        return;
+    }
+
+    const apiUrl = getApiUrl();
+    const animationType = switchValue ? "start" : "stop";
+
+    if (switchValue !== storedvalue) {
+        try {
+            console.log(animationType + " Talking Animation");
+            doExtrasFetch(`${apiUrl}/api/talkinghead/${animationType}_talking`);
+            storedvalue = switchValue; // Update the storedvalue to the current switchValue
+        } catch (error) {
+            // Handle the error here or simply ignore it to prevent logging
+        }
+    }
+    updateUiAudioPlayState()
+}
 
 function resetTtsPlayback() {
     // Stop system TTS utterance
@@ -304,6 +327,7 @@ function onAudioControlClicked() {
     // Not pausing, doing a full stop to anything TTS is doing. Better UX as pause is not as useful
     if (!audioElement.paused || isTtsProcessing()) {
         resetTtsPlayback()
+        talkingAnimation(false);
     } else {
         // Default play behavior if not processing or playing is to play the last message.
         ttsJobQueue.push(context.chat[context.chat.length - 1])
@@ -327,6 +351,7 @@ function completeCurrentAudioJob() {
     audioQueueProcessorReady = true
     currentAudioJob = null
     lastAudioPosition = 0
+    talkingAnimation(false) //stop lip animation
     // updateUiPlayState();
 }
 
@@ -352,6 +377,7 @@ async function processAudioJobQueue() {
         audioQueueProcessorReady = false
         currentAudioJob = audioJobQueue.pop()
         playAudioData(currentAudioJob)
+        talkingAnimation(true)
     } catch (error) {
         console.error(error)
         audioQueueProcessorReady = true
@@ -381,8 +407,13 @@ function saveLastValues() {
     )
 }
 
-async function tts(text, voiceId) {
-    const response = await ttsProvider.generateTts(text, voiceId)
+async function tts(text, voiceId, char) {
+    let response = await ttsProvider.generateTts(text, voiceId)
+
+    // RVC injection
+    if (extension_settings.rvc.enabled)
+        response = await rvcVoiceConversion(response, char)
+
     addAudioJob(response)
     completeTtsJob()
 }
@@ -432,7 +463,7 @@ async function processTtsQueue() {
             toastr.error(`Specified voice for ${char} was not found. Check the TTS extension settings.`)
             throw `Unable to attain voiceId for ${char}`
         }
-        tts(text, voiceId)
+        tts(text, voiceId, char)
     } catch (error) {
         console.error(error)
         currentTtsJob = null
@@ -549,6 +580,7 @@ function onEnableClick() {
     saveSettingsDebounced()
 }
 
+
 function onAutoGenerationClick() {
     extension_settings.tts.auto_generation = $('#tts_auto_generation').prop('checked');
     saveSettingsDebounced()
@@ -620,7 +652,7 @@ function onTtsProviderSettingsInput() {
 
     // Persist changes to SillyTavern tts extension settings
 
-    extension_settings.tts[ttsProviderName] = ttsProvider.setttings
+    extension_settings.tts[ttsProviderName] = ttsProvider.settings
     saveSettingsDebounced()
     console.info(`Saved settings ${ttsProviderName} ${JSON.stringify(ttsProvider.settings)}`)
 }

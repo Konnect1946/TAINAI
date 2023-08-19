@@ -4,6 +4,15 @@ export function onlyUnique(value, index, array) {
     return array.indexOf(value) === index;
 }
 
+export function isDigitsOnly(str) {
+    return /^\d+$/.test(str);
+}
+
+// Increase delay on touch screens
+export function getSortableDelay() {
+    return navigator.maxTouchPoints > 0 ? 750 : 100;
+}
+
 export function shuffle(array) {
     let currentIndex = array.length,
         randomIndex;
@@ -86,6 +95,10 @@ export async function parseJsonFile(file) {
 }
 
 export function getStringHash(str, seed = 0) {
+    if (typeof str !== 'string') {
+        return 0;
+    }
+
     let h1 = 0xdeadbeef ^ seed,
         h2 = 0x41c6ce57 ^ seed;
     for (let i = 0, ch; i < str.length; i++) {
@@ -362,96 +375,6 @@ export function splitRecursive(input, length, delimitiers = ['\n\n', '\n', ' ', 
     return result;
 }
 
-export class IndexedDBStore {
-    constructor(dbName, storeName) {
-        this.dbName = dbName;
-        this.storeName = storeName;
-        this.db = null;
-    }
-
-    async open() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.dbName);
-
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                db.createObjectStore(this.storeName, { keyPath: null, autoIncrement: false });
-            };
-
-            request.onsuccess = (event) => {
-                console.debug(`IndexedDBStore.open(${this.dbName})`);
-                this.db = event.target.result;
-                resolve(this.db);
-            };
-
-            request.onerror = (event) => {
-                console.error(`IndexedDBStore.open(${this.dbName})`);
-                reject(event.target.error);
-            };
-        });
-    }
-
-    async get(key) {
-        if (!this.db) await this.open();
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(this.storeName, "readonly");
-            const objectStore = transaction.objectStore(this.storeName);
-            const request = objectStore.get(key);
-
-            request.onsuccess = (event) => {
-                console.debug(`IndexedDBStore.get(${key})`);
-                resolve(event.target.result);
-            };
-
-            request.onerror = (event) => {
-                console.error(`IndexedDBStore.get(${key})`);
-                reject(event.target.error);
-            };
-        });
-    }
-
-    async put(key, object) {
-        if (!this.db) await this.open();
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const objectStore = transaction.objectStore(this.storeName);
-            const request = objectStore.put(object, key);
-
-            request.onsuccess = (event) => {
-                console.debug(`IndexedDBStore.put(${key})`);
-                resolve(event.target.result);
-            };
-
-            request.onerror = (event) => {
-                console.error(`IndexedDBStore.put(${key})`);
-                reject(event.target.error);
-            };
-        });
-    }
-
-    async delete(key) {
-        if (!this.db) await this.open();
-
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const objectStore = transaction.objectStore(this.storeName);
-            const request = objectStore.delete(key);
-
-            request.onsuccess = (event) => {
-                console.debug(`IndexedDBStore.delete(${key})`);
-                resolve(event.target.result);
-            };
-
-            request.onerror = (event) => {
-                console.error(`IndexedDBStore.delete(${key})`);
-                reject(event.target.error);
-            };
-        });
-    }
-}
-
 export function isDataURL(str) {
     const regex = /^data:([a-z]+\/[a-z0-9-+.]+(;[a-z-]+=[a-z0-9-]+)*;?)?(base64)?,([a-z0-9!$&',()*+;=\-_%.~:@\/?#]+)?$/i;
     return regex.test(str);
@@ -464,6 +387,20 @@ export function getCharaFilename(chid) {
     if (fileName) {
         return fileName.replace(/\.[^/.]+$/, "")
     }
+}
+
+export function extractAllWords(value) {
+    const words = [];
+
+    if (!value) {
+        return words;
+    }
+
+    const matches = value.matchAll(/\b\w+\b/gim);
+    for (let match of matches) {
+        words.push(match[0].toLowerCase());
+    }
+    return words;
 }
 
 export function escapeRegex(string) {

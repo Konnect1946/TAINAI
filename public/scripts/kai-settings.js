@@ -4,6 +4,11 @@ import {
     getStoppingStrings,
 } from "../script.js";
 
+import {
+    power_user,
+} from "./power-user.js";
+import { getSortableDelay } from "./utils.js";
+
 export {
     kai_settings,
     loadKoboldSettings,
@@ -31,16 +36,17 @@ const kai_settings = {
 
 const MIN_STOP_SEQUENCE_VERSION = '1.2.2';
 const MIN_STREAMING_KCPPVERSION = '1.30';
+const KOBOLDCPP_ORDER = [6, 0, 1, 3, 4, 2, 5];
 
 function formatKoboldUrl(value) {
     try {
         const url = new URL(value);
-        url.pathname = '/api';
+        if (!power_user.relaxed_api_urls) {
+            url.pathname = '/api';
+        }
         return url.toString();
-    }
-    catch {
-        return null;
-    }
+    } catch { } // Just using URL as a validation check
+    return null;
 }
 
 function loadKoboldSettings(preset) {
@@ -139,7 +145,7 @@ export async function generateKoboldWithStreaming(generate_data, signal) {
 
             if (done) {
                 return;
-           }
+            }
         }
     }
 }
@@ -238,7 +244,7 @@ function sortItemsByOrder(orderArray) {
     }
 }
 
-$(document).ready(function () {
+jQuery(function () {
     sliders.forEach(slider => {
         $(document).on("input", slider.sliderId, function () {
             const value = $(this).val();
@@ -262,6 +268,7 @@ $(document).ready(function () {
     });
 
     $('#kobold_order').sortable({
+        delay: getSortableDelay(),
         stop: function () {
             const order = [];
             $('#kobold_order').children().each(function () {
@@ -271,5 +278,11 @@ $(document).ready(function () {
             console.log('Samplers reordered:', kai_settings.sampler_order);
             saveSettingsDebounced();
         },
+    });
+
+    $('#samplers_order_recommended').on('click', function () {
+        kai_settings.sampler_order = KOBOLDCPP_ORDER;
+        sortItemsByOrder(kai_settings.sampler_order);
+        saveSettingsDebounced();
     });
 });

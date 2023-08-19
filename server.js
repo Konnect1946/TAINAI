@@ -1,5 +1,29 @@
 #!/usr/bin/env node
 
+createDefaultFiles();
+
+function createDefaultFiles() {
+    const fs = require('fs');
+    const path = require('path');
+    const files = {
+        settings: 'public/settings.json',
+        bg_load: 'public/css/bg_load.css',
+        config: 'config.conf',
+    };
+
+    for (const file of Object.values(files)) {
+        try {
+            if (!fs.existsSync(file)) {
+                const defaultFilePath = path.join('default', path.parse(file).base);
+                fs.copyFileSync(defaultFilePath, file);
+                console.log(`Created default file: ${file}`);
+            }
+        } catch (error) {
+            console.error(`FATAL: Could not write default file: ${file}`, error);
+        }
+    }
+}
+
 const process = require('process')
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -10,7 +34,11 @@ if (net.setDefaultAutoSelectFamily) {
 }
 
 const cliArguments = yargs(hideBin(process.argv))
-    .option('ssl', {
+    .option('disableCsrf', {
+        type: 'boolean',
+        default: false,
+        describe: 'Disables CSRF protection'
+    }).option('ssl', {
         type: 'boolean',
         default: false,
         describe: 'Enables SSL'
@@ -40,6 +68,7 @@ app.use(compression());
 app.use(responseTime());
 
 const fs = require('fs');
+const writeFileAtomicSync = require('write-file-atomic').sync;
 const readline = require('readline');
 const open = require('open');
 
@@ -47,6 +76,7 @@ const multer = require("multer");
 const http = require("http");
 const https = require('https');
 const basicAuthMiddleware = require('./src/middleware/basicAuthMiddleware');
+const contentManager = require('./src/content-manager');
 const extract = require('png-chunks-extract');
 const encode = require('png-chunks-encode');
 const PNGtext = require('png-chunk-text');
@@ -66,6 +96,9 @@ const DeviceDetector = require("device-detector-js");
 const { TextEncoder, TextDecoder } = require('util');
 const utf8Encode = new TextEncoder();
 const commandExistsSync = require('command-exists').sync;
+
+// impoort from statsHelpers.js
+const statsHelpers = require('./statsHelpers.js');
 
 const characterCardParser = require('./src/character-card-parser.js');
 const config = require(path.join(process.cwd(), './config.conf'));
@@ -91,10 +124,15 @@ const allowKeysExposure = config.allowKeysExposure;
 const axios = require('axios');
 const tiktoken = require('@dqbd/tiktoken');
 const WebSocket = require('ws');
-const AIHorde = require("./src/horde");
-const ai_horde = new AIHorde({
-    client_agent: getVersion()?.agent || 'SillyTavern:UNKNOWN:Cohee#1207',
-});
+
+function getHordeClient() {
+    const AIHorde = require("./src/horde");
+    const ai_horde = new AIHorde({
+        client_agent: getVersion()?.agent || 'SillyTavern:UNKNOWN:Cohee#1207',
+    });
+    return ai_horde;
+}
+
 const ipMatching = require('ip-matching');
 const yauzl = require('yauzl');
 
@@ -104,8 +142,6 @@ const client = new Client();
 client.on('error', (err) => {
     console.error('An error occurred:', err);
 });
-
-const poe = require('./src/poe-client');
 
 let api_server = "http://0.0.0.0:5000";
 let api_novelai = "https://api.novelai.net";
@@ -117,6 +153,15 @@ let response_generate_novel;
 let characters = {};
 let response_dw_bg;
 let response_getstatus;
+let first_run = true;
+
+
+
+function get_mancer_headers() {
+    const api_key_mancer = readSecret(SECRET_KEYS.MANCER);
+    return api_key_mancer ? { "X-API-KEY": api_key_mancer } : {};
+}
+
 
 
 //RossAscends: Added function to format dates used in files and chat timestamps to a humanized format.
@@ -128,8 +173,8 @@ let response_getstatus;
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-const { SentencePieceProcessor, cleanText } = require("sentencepiece-js");
-const { Tokenizer } = require('@mlc-ai/web-tokenizers');
+const { SentencePieceProcessor } = require("@agnai/sentencepiece-js");
+const { Tokenizer } = require('@agnai/web-tokenizers');
 const CHARS_PER_TOKEN = 3.35;
 
 let spp_llama;
@@ -151,13 +196,19 @@ async function loadSentencepieceTokenizer(modelPath) {
 async function countSentencepieceTokens(spp, text) {
     // Fallback to strlen estimation
     if (!spp) {
-        return Math.ceil(text.length / CHARS_PER_TOKEN);
+        return {
+            ids: [],
+            count: Math.ceil(text.length / CHARS_PER_TOKEN)
+        };
     }
 
-    let cleaned = cleanText(text);
+    let cleaned = text; // cleanText(text); <-- cleaning text can result in an incorrect tokenization
 
     let ids = spp.encodeIds(cleaned);
-    return ids.length;
+    return {
+        ids,
+        count: ids.length
+    };
 }
 
 async function loadClaudeTokenizer(modelPath) {
@@ -258,38 +309,49 @@ const directories = {
     thumbnailsBg: 'thumbnails/bg/',
     thumbnailsAvatar: 'thumbnails/avatar/',
     themes: 'public/themes',
+    movingUI: 'public/movingUI',
     extensions: 'public/scripts/extensions',
     instruct: 'public/instruct',
     context: 'public/context',
     backups: 'backups/',
+    quickreplies: 'public/QuickReplies'
 };
 
 // CSRF Protection //
-const doubleCsrf = require('csrf-csrf').doubleCsrf;
+if (cliArguments.disableCsrf === false) {
+    const doubleCsrf = require('csrf-csrf').doubleCsrf;
 
-const CSRF_SECRET = crypto.randomBytes(8).toString('hex');
-const COOKIES_SECRET = crypto.randomBytes(8).toString('hex');
+    const CSRF_SECRET = crypto.randomBytes(8).toString('hex');
+    const COOKIES_SECRET = crypto.randomBytes(8).toString('hex');
 
-const { generateToken, doubleCsrfProtection } = doubleCsrf({
-    getSecret: () => CSRF_SECRET,
-    cookieName: "X-CSRF-Token",
-    cookieOptions: {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: false
-    },
-    size: 64,
-    getTokenFromRequest: (req) => req.headers["x-csrf-token"]
-});
-
-app.get("/csrf-token", (req, res) => {
-    res.json({
-        "token": generateToken(res)
+    const { generateToken, doubleCsrfProtection } = doubleCsrf({
+        getSecret: () => CSRF_SECRET,
+        cookieName: "X-CSRF-Token",
+        cookieOptions: {
+            httpOnly: true,
+            sameSite: "strict",
+            secure: false
+        },
+        size: 64,
+        getTokenFromRequest: (req) => req.headers["x-csrf-token"]
     });
-});
 
-app.use(cookieParser(COOKIES_SECRET));
-app.use(doubleCsrfProtection);
+    app.get("/csrf-token", (req, res) => {
+        res.json({
+            "token": generateToken(res)
+        });
+    });
+
+    app.use(cookieParser(COOKIES_SECRET));
+    app.use(doubleCsrfProtection);
+} else {
+    console.warn("\nCSRF protection is disabled. This will make your server vulnerable to CSRF attacks.\n");
+    app.get("/csrf-token", (req, res) => {
+        res.json({
+            "token": 'disabled'
+        });
+    });
+}
 
 // CORS Settings //
 const cors = require('cors');
@@ -391,7 +453,7 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
     const controller = new AbortController();
     request.socket.removeAllListeners('close');
     request.socket.on('close', async function () {
-        if (request.body.can_abort && !response_generate.finished) {
+        if (request.body.can_abort && !response_generate.writableEnded) {
             try {
                 console.log('Aborting Kobold generation...');
                 // send abort signal to koboldcpp
@@ -477,11 +539,20 @@ app.post("/generate", jsonParser, async function (request, response_generate = r
                 return response.body.pipe(response_generate);
             } else {
                 if (!response.ok) {
-                    console.log(`Kobold returned error: ${response.status} ${response.statusText} ${await response.text()}`);
-                    return response.status(response.status).send({ error: true });
+                    const errorText = await response.text();
+                    console.log(`Kobold returned error: ${response.status} ${response.statusText} ${errorText}`);
+
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        const message = errorJson?.detail?.msg || errorText;
+                        return response_generate.status(400).send({ error: { message } });
+                    } catch {
+                        return response_generate.status(400).send({ error: { message: errorText } });
+                    }
                 }
 
                 const data = await response.json();
+                console.log("Endpoint response:", data);
                 return response_generate.send(data);
             }
         } catch (error) {
@@ -531,18 +602,14 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
             const websocket = new WebSocket(streamingUrl);
 
             websocket.on('open', async function () {
-                console.log('websocket open');
-                websocket.send(JSON.stringify(request.body));
-            });
-
-            websocket.on('error', (err) => {
-                console.error(err);
-                websocket.close();
+                console.log('WebSocket opened');
+                const combined_args = Object.assign(request.body.use_mancer ? get_mancer_headers() : {}, request.body);
+                websocket.send(JSON.stringify(combined_args));
             });
 
             websocket.on('close', (code, buffer) => {
                 const reason = new TextDecoder().decode(buffer)
-                console.log(reason);
+                console.log("WebSocket closed (reason: %o)", reason);
             });
 
             while (true) {
@@ -551,8 +618,27 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
                     websocket.close();
                     return;
                 }
+                
+                let rawMessage = null;
+                try {
+                    // This lunacy is because the websocket can fail to connect AFTER we're awaiting 'message'... so 'message' never triggers.
+                    // So instead we need to look for 'error' at the same time to reject the promise. And then remove the listener if we resolve.
+                    // This is awful.
+                    // Welcome to the shenanigan shack.
+                    rawMessage = await new Promise(function (resolve, reject) {
+                        websocket.once('error', reject);
+                        websocket.once('message', (data, isBinary) => {
+                            websocket.removeListener('error', reject);
+                            resolve(data, isBinary);
+                        });
+                    });
+                } catch(err) {
+                    console.error("Socket error:", err);
+                    websocket.close();
+                    yield "[SillyTavern] Streaming failed:\n" + err;
+                    return;
+                }
 
-                const rawMessage = await new Promise(resolve => websocket.once('message', resolve));
                 const message = json5.parse(rawMessage);
 
                 switch (message.event) {
@@ -597,13 +683,22 @@ app.post("/generate_textgenerationwebui", jsonParser, async function (request, r
             signal: controller.signal,
         };
 
+        if (request.body.use_mancer) {
+            args.headers = Object.assign(args.headers, get_mancer_headers());
+        }
+
         try {
             const data = await postAsync(api_server + "/v1/generate", args);
-            console.log(data);
+            console.log("Endpoint response:", data);
             return response_generate.send(data);
         } catch (error) {
-            console.log(error);
-            return response_generate.send({ error: true });
+            retval = { error: true, status: error.status, response: error.statusText };
+            console.log("Endpoint error:", error);
+            try {
+                retval.response = await error.json();
+                retval.response = retval.response.result;
+            } catch { }
+            return response_generate.send(retval);
         }
     }
 });
@@ -614,7 +709,7 @@ app.post("/savechat", jsonParser, function (request, response) {
         var dir_name = String(request.body.avatar_url).replace('.png', '');
         let chat_data = request.body.chat;
         let jsonlData = chat_data.map(JSON.stringify).join('\n');
-        fs.writeFileSync(`${chatsPath + sanitize(dir_name)}/${sanitize(String(request.body.file_name))}.jsonl`, jsonlData, 'utf8');
+        writeFileAtomicSync(`${chatsPath + sanitize(dir_name)}/${sanitize(String(request.body.file_name))}.jsonl`, jsonlData, 'utf8');
         return response.send({ result: "ok" });
     } catch (error) {
         response.send(error);
@@ -667,6 +762,11 @@ app.post("/getstatus", jsonParser, async function (request, response_getstatus =
     var args = {
         headers: { "Content-Type": "application/json" }
     };
+
+    if (main_api == 'textgenerationwebui' && request.body.use_mancer) {
+        args.headers = Object.assign(args.headers, get_mancer_headers());
+    }
+
     var url = api_server + "/v1/model";
     let version = '';
     let koboldVersion = {};
@@ -687,18 +787,18 @@ app.post("/getstatus", jsonParser, async function (request, response_getstatus =
             };
         }
     }
-    client.get(url, args, function (data, response) {
+    client.get(url, args, async function (data, response) {
         if (typeof data !== 'object') {
             data = {};
         }
         if (response.statusCode == 200) {
             data.version = version;
             data.koboldVersion = koboldVersion;
-            if (data.result != "ReadOnly") {
-            } else {
+            if (data.result == "ReadOnly") {
                 data.result = "no_connection";
             }
         } else {
+            data.response = data.result;
             data.result = "no_connection";
         }
         response_getstatus.send(data);
@@ -761,10 +861,11 @@ function convertToV2(char) {
         tags: char.tags,
     });
 
-    result.chat = char.chat;
+    result.chat = char.chat ?? humanizedISO8601DateTime();
     result.create_date = char.create_date;
     return result;
 }
+
 
 function unsetFavFlag(char) {
     const _ = require('lodash');
@@ -819,6 +920,8 @@ function readFromV2(char) {
         }
         char[charField] = v2Value;
     });
+
+    char['chat'] = char['chat'] ?? humanizedISO8601DateTime();
 
     return char;
 }
@@ -1070,14 +1173,14 @@ app.post("/editcharacterattribute", jsonParser, async function (request, respons
             charaWrite(avatarPath, char, (request.body.avatar_url).replace('.png', ''), response, 'Character saved');
         }).catch((err) => {
             console.error('An error occured, character edit invalidated.', err);
-        } );
+        });
     }
     catch {
         console.error('An error occured, character edit invalidated.');
     }
 });
 
-app.post("/deletecharacter", urlencodedParser, async function (request, response) {
+app.post("/deletecharacter", jsonParser, async function (request, response) {
     if (!request.body || !request.body.avatar_url) {
         return response.sendStatus(400);
     }
@@ -1101,7 +1204,7 @@ app.post("/deletecharacter", urlencodedParser, async function (request, response
         return response.sendStatus(403);
     }
 
-    if (request.body.delete_chats == 'true') {
+    if (request.body.delete_chats == true) {
         try {
             await fs.promises.rm(path.join(chatsPath, sanitize(dir_name)), { recursive: true, force: true })
         } catch (err) {
@@ -1131,7 +1234,7 @@ async function charaWrite(img_url, data, target_img, response = undefined, mes =
         chunks.splice(-1, 0, PNGtext.encode('chara', base64EncodedData));
         //chunks.splice(-1, 0, text.encode('lorem', 'ipsum'));
 
-        fs.writeFileSync(charactersPath + target_img + '.png', new Buffer.from(encode(chunks)));
+        writeFileAtomicSync(charactersPath + target_img + '.png', new Buffer.from(encode(chunks)));
         if (response !== undefined) response.send(mes);
         return true;
     } catch (err) {
@@ -1169,6 +1272,90 @@ async function charaRead(img_url, input_format) {
     return characterCardParser.parse(img_url, input_format);
 }
 
+/**
+ * calculateChatSize - Calculates the total chat size for a given character.
+ *
+ * @param  {string} charDir The directory where the chats are stored.
+ * @return {number}         The total chat size.
+ */
+const calculateChatSize = (charDir) => {
+    let chatSize = 0;
+    let dateLastChat = 0;
+
+    if (fs.existsSync(charDir)) {
+        const chats = fs.readdirSync(charDir);
+        if (Array.isArray(chats) && chats.length) {
+            for (const chat of chats) {
+                const chatStat = fs.statSync(path.join(charDir, chat));
+                chatSize += chatStat.size;
+                dateLastChat = Math.max(dateLastChat, chatStat.mtimeMs);
+            }
+        }
+    }
+
+    return { chatSize, dateLastChat };
+}
+
+// Calculate the total string length of the data object
+const calculateDataSize = (data) => {
+    return typeof data === 'object' ? Object.values(data).reduce((acc, val) => acc + new String(val).length, 0) : 0;
+}
+
+/**
+ * processCharacter - Process a given character, read its data and calculate its statistics.
+ *
+ * @param  {string} item The name of the character.
+ * @param  {number} i    The index of the character in the characters list.
+ * @return {Promise}     A Promise that resolves when the character processing is done.
+ */
+const processCharacter = async (item, i) => {
+    try {
+        const img_data = await charaRead(charactersPath + item);
+        let jsonObject = getCharaCardV2(json5.parse(img_data));
+        jsonObject.avatar = item;
+        characters[i] = jsonObject;
+        characters[i]['json_data'] = img_data;
+        const charStat = fs.statSync(path.join(charactersPath, item));
+        characters[i]['date_added'] = charStat.birthtimeMs;
+        const char_dir = path.join(chatsPath, item.replace('.png', ''));
+
+        const { chatSize, dateLastChat } = calculateChatSize(char_dir);
+        characters[i]['chat_size'] = chatSize;
+        characters[i]['date_last_chat'] = dateLastChat;
+        characters[i]['data_size'] = calculateDataSize(jsonObject?.data);
+    }
+    catch (err) {
+        characters[i] = {
+            date_added: 0,
+            date_last_chat: 0,
+            chat_size: 0
+        };
+
+        console.log(`Could not process character: ${item}`);
+
+        if (err instanceof SyntaxError) {
+            console.log("String [" + i + "] is not valid JSON!");
+        } else {
+            console.log("An unexpected error occurred: ", err);
+        }
+    }
+}
+
+
+/**
+ * HTTP POST endpoint for the "/getcharacters" route.
+ *
+ * This endpoint is responsible for reading character files from the `charactersPath` directory,
+ * parsing character data, calculating stats for each character and responding with the data.
+ * Stats are calculated only on the first run, on subsequent runs the stats are fetched from
+ * the `charStats` variable.
+ * The stats are calculated by the `calculateStats` function.
+ * The characters are processed by the `processCharacter` function.
+ *
+ * @param  {object}   request  The HTTP request object.
+ * @param  {object}   response The HTTP response object.
+ * @return {undefined}         Does not return a value.
+ */
 app.post("/getcharacters", jsonParser, function (request, response) {
     fs.readdir(charactersPath, async (err, files) => {
         if (err) {
@@ -1177,63 +1364,49 @@ app.post("/getcharacters", jsonParser, function (request, response) {
         }
 
         const pngFiles = files.filter(file => file.endsWith('.png'));
-
-        //console.log(pngFiles);
         characters = {};
-        var i = 0;
-        for (const item of pngFiles) {
-            try {
-                var img_data = await charaRead(charactersPath + item);
-                let jsonObject = getCharaCardV2(json5.parse(img_data));
-                jsonObject.avatar = item;
-                characters[i] = {};
-                characters[i] = jsonObject;
-                characters[i]['json_data'] = img_data;
 
-                try {
-                    const charStat = fs.statSync(path.join(charactersPath, item));
-                    characters[i]['date_added'] = charStat.birthtimeMs;
-                    const char_dir = path.join(chatsPath, item.replace('.png', ''));
+        let processingPromises = pngFiles.map((file, index) => processCharacter(file, index));
+        await Promise.all(processingPromises); performance.mark('B');
 
-                    let chat_size = 0;
-                    let date_last_chat = 0;
-
-                    if (fs.existsSync(char_dir)) {
-                        const chats = fs.readdirSync(char_dir);
-
-                        if (Array.isArray(chats) && chats.length) {
-                            for (const chat of chats) {
-                                const chatStat = fs.statSync(path.join(char_dir, chat));
-                                chat_size += chatStat.size;
-                                date_last_chat = Math.max(date_last_chat, chatStat.mtimeMs);
-                            }
-                        }
-                    }
-
-                    characters[i]['date_last_chat'] = date_last_chat;
-                    characters[i]['chat_size'] = chat_size;
-                }
-                catch {
-                    characters[i]['date_added'] = 0;
-                    characters[i]['date_last_chat'] = 0;
-                    characters[i]['chat_size'] = 0;
-                }
-
-                i++;
-            } catch (error) {
-                console.log(`Could not read character: ${item}`);
-                if (error instanceof SyntaxError) {
-                    console.log("String [" + (i) + "] is not valid JSON!");
-                } else {
-                    console.log("An unexpected error occurred: ", error);
-                }
-            }
-        };
-        //console.log(characters);
         response.send(JSON.stringify(characters));
     });
-
 });
+
+
+
+/**
+ * Handle a POST request to get the stats object
+ *
+ * This function returns the stats object that was calculated by the `calculateStats` function.
+ *
+ *
+ * @param {Object} request - The HTTP request object.
+ * @param {Object} response - The HTTP response object.
+ * @returns {void}
+ */
+app.post("/getstats", jsonParser, function (request, response) {
+    response.send(JSON.stringify(statsHelpers.getCharStats()));
+});
+
+/**
+ * Handle a POST request to update the stats object
+ *
+ * This function updates the stats object with the data from the request body.
+ *
+ * @param {Object} request - The HTTP request object.
+ * @param {Object} response - The HTTP response object.
+ * @returns {void}
+ *
+*/
+app.post("/updatestats", jsonParser, function (request, response) {
+    if (!request.body) return response.sendStatus(400);
+    statsHelpers.setCharStats(request.body);
+    return response.sendStatus(200);
+});
+
+
+
 app.post("/getbackgrounds", jsonParser, function (request, response) {
     var images = getImages("public/backgrounds");
     response.send(JSON.stringify(images));
@@ -1272,18 +1445,16 @@ app.post('/deleteuseravatar', jsonParser, function (request, response) {
 });
 
 app.post("/setbackground", jsonParser, function (request, response) {
-    var bg = "#bg1 {background-image: url('../backgrounds/" + request.body.bg + "');}";
-    fs.writeFile('public/css/bg_load.css', bg, 'utf8', function (err) {
-        if (err) {
-            response.send(err);
-            return console.log(err);
-        } else {
-            //response.redirect("/");
-            response.send({ result: 'ok' });
-        }
-    });
-
+    try {
+        const bg = `#bg1 {background-image: url('../backgrounds/${request.body.bg}');}`;
+        writeFileAtomicSync('public/css/bg_load.css', bg, 'utf8');
+        response.send({ result: 'ok' });
+    } catch (err) {
+        console.log(err);
+        response.send(err);
+    }
 });
+
 app.post("/delbackground", jsonParser, function (request, response) {
     if (!request.body) return response.sendStatus(400);
 
@@ -1335,60 +1506,52 @@ app.post("/delchat", jsonParser, function (request, response) {
     return response.send('ok');
 });
 
+app.post('/renamebackground', jsonParser, function (request, response) {
+    if (!request.body) return response.sendStatus(400);
+
+    const oldFileName = path.join('public/backgrounds/', sanitize(request.body.old_bg));
+    const newFileName = path.join('public/backgrounds/', sanitize(request.body.new_bg));
+
+    if (!fs.existsSync(oldFileName)) {
+        console.log('BG file not found');
+        return response.sendStatus(400);
+    }
+
+    if (fs.existsSync(newFileName)) {
+        console.log('New BG file already exists');
+        return response.sendStatus(400);
+    }
+
+    fs.renameSync(oldFileName, newFileName);
+    invalidateThumbnail('bg', request.body.old_bg);
+    return response.send('ok');
+});
 
 app.post("/downloadbackground", urlencodedParser, function (request, response) {
     response_dw_bg = response;
-    if (!request.body) return response.sendStatus(400);
+    if (!request.body || !request.file) return response.sendStatus(400);
 
-    let filedata = request.file;
-    //console.log(filedata.mimetype);
-    var fileType = ".png";
-    var img_file = "ai";
-    var img_path = "public/img/";
+    const img_path = path.join("uploads/", request.file.filename);
+    const filename = request.file.originalname;
 
-    img_path = "uploads/";
-    img_file = filedata.filename;
-    if (filedata.mimetype == "image/jpeg") fileType = ".jpeg";
-    if (filedata.mimetype == "image/png") fileType = ".png";
-    if (filedata.mimetype == "image/gif") fileType = ".gif";
-    if (filedata.mimetype == "image/bmp") fileType = ".bmp";
-    fs.copyFile(img_path + img_file, 'public/backgrounds/' + img_file + fileType, (err) => {
-        invalidateThumbnail('bg', img_file + fileType);
-        if (err) {
-
-            return console.log(err);
-        } else {
-            //console.log(img_file+fileType);
-            response_dw_bg.send(img_file + fileType);
-        }
-        //console.log('The image was copied from temp directory.');
-    });
-
-
+    try {
+        fs.copyFileSync(img_path, path.join('public/backgrounds/', filename));
+        invalidateThumbnail('bg', filename);
+        response_dw_bg.send(filename);
+    } catch (err) {
+        console.error(err);
+        response_dw_bg.sendStatus(500);
+    }
 });
 
-
-
 app.post("/savesettings", jsonParser, function (request, response) {
-    fs.writeFile('public/settings.json', JSON.stringify(request.body, null, 4), 'utf8', function (err) {
-        if (err) {
-            response.send(err);
-            console.log(err);
-        } else {
-            response.send({ result: "ok" });
-        }
-    });
-
-    /*fs.writeFile('public/settings.json', JSON.stringify(request.body), 'utf8', function (err) {
-        if (err) {
-            response.send(err);
-            return console.log(err);
-            //response.send(err);
-        } else {
-            //response.redirect("/");
-            response.send({ result: "ok" });
-        }
-    });*/
+    try {
+        writeFileAtomicSync('public/settings.json', JSON.stringify(request.body, null, 4), 'utf8');
+        response.send({ result: "ok" });
+    } catch (err) {
+        console.log(err);
+        response.send(err);
+    }
 });
 
 function getCharaCardV2(jsonObject) {
@@ -1423,6 +1586,10 @@ function readAndParseFromDirectory(directoryPath, fileExtension = '.json') {
 
 function sortByModifiedDate(directory) {
     return (a, b) => new Date(fs.statSync(`${directory}/${b}`).mtime) - new Date(fs.statSync(`${directory}/${a}`).mtime);
+}
+
+function sortByName(_) {
+    return (a, b) => a.localeCompare(b);
 }
 
 function readPresetsFromDirectory(directoryPath, options = {}) {
@@ -1461,7 +1628,7 @@ app.post('/getsettings', jsonParser, (request, response) => {
     // NovelAI Settings
     const { fileContents: novelai_settings, fileNames: novelai_setting_names }
         = readPresetsFromDirectory(directories.novelAI_Settings, {
-            sortFunction: sortByModifiedDate(directories.novelAI_Settings),
+            sortFunction: sortByName(directories.novelAI_Settings),
             removeFileExtension: true
         });
 
@@ -1474,13 +1641,13 @@ app.post('/getsettings', jsonParser, (request, response) => {
     // TextGenerationWebUI Settings
     const { fileContents: textgenerationwebui_presets, fileNames: textgenerationwebui_preset_names }
         = readPresetsFromDirectory(directories.textGen_Settings, {
-            sortFunction: sortByModifiedDate(directories.textGen_Settings), removeFileExtension: true
+            sortFunction: sortByName(directories.textGen_Settings), removeFileExtension: true
         });
 
     //Kobold
     const { fileContents: koboldai_settings, fileNames: koboldai_setting_names }
         = readPresetsFromDirectory(directories.koboldAI_Settings, {
-            sortFunction: sortByModifiedDate(directories.koboldAI_Settings), removeFileExtension: true
+            sortFunction: sortByName(directories.koboldAI_Settings), removeFileExtension: true
         })
 
     const worldFiles = fs
@@ -1490,6 +1657,9 @@ app.post('/getsettings', jsonParser, (request, response) => {
     const world_names = worldFiles.map(item => path.parse(item).name);
 
     const themes = readAndParseFromDirectory(directories.themes);
+    const movingUIPresets = readAndParseFromDirectory(directories.movingUI);
+    const quickReplyPresets = readAndParseFromDirectory(directories.quickreplies);
+
     const instruct = readAndParseFromDirectory(directories.instruct);
     const context = readAndParseFromDirectory(directories.context);
 
@@ -1505,6 +1675,8 @@ app.post('/getsettings', jsonParser, (request, response) => {
         textgenerationwebui_presets,
         textgenerationwebui_preset_names,
         themes,
+        movingUIPresets,
+        quickReplyPresets,
         instruct,
         context,
         enable_extensions: enableExtensions,
@@ -1545,7 +1717,29 @@ app.post('/savetheme', jsonParser, (request, response) => {
     }
 
     const filename = path.join(directories.themes, sanitize(request.body.name) + '.json');
-    fs.writeFileSync(filename, JSON.stringify(request.body, null, 4), 'utf8');
+    writeFileAtomicSync(filename, JSON.stringify(request.body, null, 4), 'utf8');
+
+    return response.sendStatus(200);
+});
+
+app.post('/savemovingui', jsonParser, (request, response) => {
+    if (!request.body || !request.body.name) {
+        return response.sendStatus(400);
+    }
+
+    const filename = path.join(directories.movingUI, sanitize(request.body.name) + '.json');
+    writeFileAtomicSync(filename, JSON.stringify(request.body, null, 4), 'utf8');
+
+    return response.sendStatus(200);
+});
+
+app.post('/savequickreply', jsonParser, (request, response) => {
+    if (!request.body || !request.body.name) {
+        return response.sendStatus(400);
+    }
+
+    const filename = path.join(directories.quickreplies, sanitize(request.body.name) + '.json');
+    writeFileAtomicSync(filename, JSON.stringify(request.body, null, 4), 'utf8');
 
     return response.sendStatus(200);
 });
@@ -1618,13 +1812,12 @@ app.post("/getstatus_novelai", jsonParser, function (request, response_getstatus
     const api_key_novel = readSecret(SECRET_KEYS.NOVEL);
 
     if (!api_key_novel) {
-        return response_generate_novel.sendStatus(401);
+        return response_getstatus_novel.sendStatus(401);
     }
 
     var data = {};
     var args = {
         data: data,
-
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + api_key_novel }
     };
     client.get(api_novelai + "/user/subscription", args, function (data, response) {
@@ -1632,17 +1825,15 @@ app.post("/getstatus_novelai", jsonParser, function (request, response_getstatus
             //console.log(data);
             response_getstatus_novel.send(data);//data);
         }
-        if (response.statusCode == 401) {
-            console.log('Access Token is incorrect.');
-            response_getstatus_novel.send({ error: true });
-        }
-        if (response.statusCode == 500 || response.statusCode == 501 || response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507) {
+        else {
+            if (response.statusCode == 401) {
+                console.log('Access Token is incorrect.');
+            }
+
             console.log(data);
             response_getstatus_novel.send({ error: true });
         }
     }).on('error', function () {
-        //console.log('');
-        //console.log('something went wrong on the request', err.request.options);
         response_getstatus_novel.send({ error: true });
     });
 });
@@ -1662,9 +1853,27 @@ app.post("/generate_novelai", jsonParser, async function (request, response_gene
         controller.abort();
     });
 
-    console.log(request.body);
-    const bw = require('./src/bad-words');
-    const bad_words_ids = request.body.model.includes('clio') ? bw.clioBadWordsId : bw.badWordIds;
+    const novelai = require('./src/novelai');
+    const isNewModel = (request.body.model.includes('clio') || request.body.model.includes('kayra'));
+    const isKrake = request.body.model.includes('krake');
+    const badWordsList = (isNewModel ? novelai.badWordsList : (isKrake ? novelai.krakeBadWordsList : novelai.euterpeBadWordsList)).slice();
+
+    // Add customized bad words for Clio and Kayra
+    if (isNewModel && Array.isArray(request.body.bad_words_ids)) {
+        for (const badWord of request.body.bad_words_ids) {
+            if (Array.isArray(badWord) && badWord.every(x => Number.isInteger(x))) {
+                badWordsList.push(badWord);
+            }
+        }
+    }
+
+    // Add default biases for dinkus and asterism
+    const logit_bias_exp = isNewModel ? novelai.logitBiasExp.slice() : null;
+
+    if (Array.isArray(logit_bias_exp) && Array.isArray(request.body.logit_bias_exp)) {
+        logit_bias_exp.push(...request.body.logit_bias_exp);
+    }
+
     const data = {
         "input": request.body.input,
         "model": request.body.model,
@@ -1679,12 +1888,19 @@ app.post("/generate_novelai", jsonParser, async function (request, response_gene
             "repetition_penalty_slope": request.body.repetition_penalty_slope,
             "repetition_penalty_frequency": request.body.repetition_penalty_frequency,
             "repetition_penalty_presence": request.body.repetition_penalty_presence,
+            "repetition_penalty_whitelist": isNewModel ? novelai.repPenaltyAllowList : null,
             "top_a": request.body.top_a,
             "top_p": request.body.top_p,
             "top_k": request.body.top_k,
             "typical_p": request.body.typical_p,
-            //"stop_sequences": {{187}},
-            "bad_words_ids": bad_words_ids,
+            "mirostat_lr": request.body.mirostat_lr,
+            "mirostat_tau": request.body.mirostat_tau,
+            "cfg_scale": request.body.cfg_scale,
+            "cfg_uc": request.body.cfg_uc,
+            "phrase_rep_pen": request.body.phrase_rep_pen,
+            "stop_sequences": request.body.stop_sequences,
+            "bad_words_ids": badWordsList,
+            "logit_bias_exp": logit_bias_exp,
             //generate_until_sentence = true;
             "use_cache": request.body.use_cache,
             "use_string": true,
@@ -1693,6 +1909,8 @@ app.post("/generate_novelai", jsonParser, async function (request, response_gene
             "order": request.body.order
         }
     };
+    const util = require('util');
+    console.log(util.inspect(data, { depth: 4 }))
 
     const args = {
         body: JSON.stringify(data),
@@ -1720,11 +1938,23 @@ app.post("/generate_novelai", jsonParser, async function (request, response_gene
             });
         } else {
             if (!response.ok) {
-                console.log(`Novel API returned error: ${response.status} ${response.statusText} ${await response.text()}`);
-                return response.status(response.status).send({ error: true });
+                const text = await response.text();
+                let message = text;
+                console.log(`Novel API returned error: ${response.status} ${response.statusText} ${text}`);
+
+                try {
+                    const data = JSON.parse(text);
+                    message = data.message;
+                }
+                catch {
+                    // ignore
+                }
+
+                return response_generate_novel.status(response.status).send({ error: { message } });
             }
 
             const data = await response.json();
+            console.log(data);
             return response_generate_novel.send(data);
         }
     } catch (error) {
@@ -1779,14 +2009,16 @@ app.post("/getallchatsofcharacter", jsonParser, function (request, response) {
                     ii--;
                     if (lastLine) {
 
-                        let jsonData = json5.parse(lastLine);
-                        if (jsonData.name !== undefined || jsonData.character_name !== undefined) {
+                        let jsonData = tryParse(lastLine);
+                        if (jsonData && (jsonData.name !== undefined || jsonData.character_name !== undefined)) {
                             chatData[i] = {};
                             chatData[i]['file_name'] = file;
                             chatData[i]['file_size'] = fileSizeInKB;
                             chatData[i]['chat_items'] = itemCounter - 1;
                             chatData[i]['mes'] = jsonData['mes'] || '[The chat is empty]';
                             chatData[i]['last_mes'] = jsonData['send_date'] || Date.now();
+                        } else {
+                            console.log('Found an invalid or corrupted chat file: ' + fullPathAndFile);
                         }
                     }
                     if (ii === 0) {
@@ -1832,7 +2064,7 @@ app.post("/importcharacter", urlencodedParser, async function (request, response
                     response.send({ error: true });
                 }
 
-                let = jsonData = json5.parse(data);
+                let jsonData = json5.parse(data);
 
                 if (jsonData.spec !== undefined) {
                     console.log('importing from v2 json');
@@ -2101,7 +2333,7 @@ app.post("/exportcharacter", jsonParser, async function (request, response) {
                     },
                 };
                 const exifString = exif.dump(metadata);
-                fs.writeFileSync(metadataPath, exifString, 'binary');
+                writeFileAtomicSync(metadataPath, exifString, 'binary');
 
                 await webp.cwebp(filename, inputWebpPath, '-q 95');
                 await webp.webpmux_add(inputWebpPath, outputWebpPath, metadataPath, 'exif');
@@ -2183,13 +2415,17 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                     });
 
                     const errors = [];
-                    newChats.forEach(chat => fs.writeFile(
-                        `${chatsPath + avatar_url}/${ch_name} - ${humanizedISO8601DateTime()} imported.jsonl`,
-                        chat.map(JSON.stringify).join('\n'),
-                        'utf8',
-                        (err) => err ?? errors.push(err)
-                    )
-                    );
+
+                    for (const chat of newChats) {
+                        const filePath = `${chatsPath + avatar_url}/${ch_name} - ${humanizedISO8601DateTime()} imported.jsonl`;
+                        const fileContent = chat.map(tryParse).filter(x => x).join('\n');
+
+                        try {
+                            writeFileAtomicSync(filePath, fileContent, 'utf8');
+                        } catch (err) {
+                            errors.push(err);
+                        }
+                    }
 
                     if (0 < errors.length) {
                         response.send('Errors occurred while writing character files. Errors: ' + JSON.stringify(errors));
@@ -2227,7 +2463,7 @@ app.post("/importchat", urlencodedParser, function (request, response) {
                         }
                     }
 
-                    fs.writeFileSync(`${chatsPath + avatar_url}/${ch_name} - ${humanizedISO8601DateTime()} imported.jsonl`, chat.map(JSON.stringify).join('\n'), 'utf8');
+                    writeFileAtomicSync(`${chatsPath + avatar_url}/${ch_name} - ${humanizedISO8601DateTime()} imported.jsonl`, chat.map(JSON.stringify).join('\n'), 'utf8');
 
                     response.send({ res: true });
                 } else {
@@ -2296,7 +2532,7 @@ app.post('/importworldinfo', urlencodedParser, (request, response) => {
         return response.status(400).send('World file must have a name');
     }
 
-    fs.writeFileSync(pathToNewFile, fileContents);
+    writeFileAtomicSync(pathToNewFile, fileContents);
     return response.send({ name: worldName });
 });
 
@@ -2320,7 +2556,7 @@ app.post('/editworldinfo', jsonParser, (request, response) => {
     const filename = `${sanitize(request.body.name)}.json`;
     const pathToFile = path.join(directories.worlds, filename);
 
-    fs.writeFileSync(pathToFile, JSON.stringify(request.body.data, null, 4));
+    writeFileAtomicSync(pathToFile, JSON.stringify(request.body.data, null, 4));
 
     return response.send({ ok: true });
 });
@@ -2341,7 +2577,7 @@ app.post('/uploaduseravatar', urlencodedParser, async (request, response) => {
 
         const filename = request.body.overwrite_name || `${Date.now()}.png`;
         const pathToNewFile = path.join(directories.avatars, filename);
-        fs.writeFileSync(pathToNewFile, image);
+        writeFileAtomicSync(pathToNewFile, image);
         fs.rmSync(pathToUpload);
         return response.send({ path: filename });
     } catch (err) {
@@ -2418,7 +2654,7 @@ app.post('/creategroup', jsonParser, (request, response) => {
         fs.mkdirSync(directories.groups);
     }
 
-    fs.writeFileSync(pathToFile, fileData);
+    writeFileAtomicSync(pathToFile, fileData);
     return response.send(groupMetadata);
 });
 
@@ -2430,7 +2666,7 @@ app.post('/editgroup', jsonParser, (request, response) => {
     const pathToFile = path.join(directories.groups, `${id}.json`);
     const fileData = JSON.stringify(request.body);
 
-    fs.writeFileSync(pathToFile, fileData);
+    writeFileAtomicSync(pathToFile, fileData);
     return response.send({ ok: true });
 });
 
@@ -2484,7 +2720,7 @@ app.post('/savegroupchat', jsonParser, (request, response) => {
 
     let chat_data = request.body.chat;
     let jsonlData = chat_data.map(JSON.stringify).join('\n');
-    fs.writeFileSync(pathToFile, jsonlData, 'utf8');
+    writeFileAtomicSync(pathToFile, jsonlData, 'utf8');
     return response.send({ ok: true });
 });
 
@@ -2519,247 +2755,6 @@ app.post('/deletegroup', jsonParser, async (request, response) => {
     }
 
     return response.send({ ok: true });
-});
-
-const POE_DEFAULT_BOT = 'a2';
-
-const poeClientCache = {};
-
-async function getPoeClient(token, useCache = false) {
-    let client;
-
-    if (useCache && poeClientCache[token]) {
-        client = poeClientCache[token];
-    }
-    else {
-        client = new poe.Client(true, useCache);
-        await client.init(token);
-    }
-
-    poeClientCache[token] = client;
-    return client;
-}
-
-app.post('/status_poe', jsonParser, async (request, response) => {
-    const token = readSecret(SECRET_KEYS.POE);
-
-    if (!token) {
-        return response.sendStatus(401);
-    }
-
-    try {
-        const client = await getPoeClient(token, false);
-        const botNames = client.get_bot_names();
-        //client.disconnect_ws();
-
-        return response.send({ 'bot_names': botNames });
-    }
-    catch (err) {
-        console.error(err);
-        return response.sendStatus(401);
-    }
-});
-
-app.post('/purge_poe', jsonParser, async (request, response) => {
-    const token = readSecret(SECRET_KEYS.POE);
-
-    if (!token) {
-        return response.sendStatus(401);
-    }
-
-    const bot = request.body.bot ?? POE_DEFAULT_BOT;
-    const count = request.body.count ?? -1;
-
-    try {
-        const client = await getPoeClient(token, true);
-        if (count > 0) {
-            await client.purge_conversation(bot, count);
-        }
-        else {
-            await client.send_chat_break(bot);
-        }
-        //client.disconnect_ws();
-
-        return response.send({ "ok": true });
-    }
-    catch (err) {
-        console.error(err);
-        return response.sendStatus(500);
-    }
-});
-
-app.post('/generate_poe', jsonParser, async (request, response) => {
-    if (!request.body.prompt) {
-        return response.sendStatus(400);
-    }
-
-    const token = readSecret(SECRET_KEYS.POE);
-
-    if (!token) {
-        return response.sendStatus(401);
-    }
-
-    let isGenerationStopped = false;
-    const abortController = new AbortController();
-    request.socket.removeAllListeners('close');
-    request.socket.on('close', function () {
-        isGenerationStopped = true;
-
-        if (client) {
-            abortController.abort();
-        }
-    });
-    const prompt = request.body.prompt;
-    const bot = request.body.bot ?? POE_DEFAULT_BOT;
-    const streaming = request.body.streaming ?? false;
-
-    let client;
-
-    try {
-        client = await getPoeClient(token, true);
-    }
-    catch (error) {
-        console.error(error);
-        return response.sendStatus(500);
-    }
-
-    if (streaming) {
-        try {
-            let reply = '';
-            for await (const mes of client.send_message(bot, prompt, false, 60, abortController.signal)) {
-                if (response.headersSent === false) {
-                    response.writeHead(200, {
-                        'Content-Type': 'text/plain;charset=utf-8',
-                        'Transfer-Encoding': 'chunked',
-                        'Cache-Control': 'no-transform',
-                        'X-Message-Id': String(mes.messageId),
-                    });
-                }
-
-                if (isGenerationStopped) {
-                    console.error('Streaming stopped by user. Closing websocket...');
-                    break;
-                }
-
-                let newText = mes.text.substring(reply.length);
-                reply = mes.text;
-                response.write(newText);
-            }
-            console.log(reply);
-        }
-        catch (err) {
-            console.error(err);
-        }
-        finally {
-            //client.disconnect_ws();
-            response.end();
-        }
-    }
-    else {
-        try {
-            let reply;
-            let messageId;
-            for await (const mes of client.send_message(bot, prompt, false, 60, abortController.signal)) {
-                reply = mes.text;
-                messageId = mes.messageId;
-            }
-            console.log(reply);
-            //client.disconnect_ws();
-            response.set('X-Message-Id', String(messageId));
-            return response.send({ 'reply': reply });
-        }
-        catch {
-            //client.disconnect_ws();
-            return response.sendStatus(500);
-        }
-    }
-});
-
-app.post('/poe_suggest', jsonParser, async function (request, response) {
-    const token = readSecret(SECRET_KEYS.POE);
-    const messageId = request.body.messageId;
-
-    if (!messageId) {
-        return response.sendStatus(400);
-    }
-
-    if (!token) {
-        return response.sendStatus(401);
-    }
-
-    try {
-        const bot = request.body.bot ?? POE_DEFAULT_BOT;
-        const client = await getPoeClient(token, true);
-
-        response.writeHead(200, {
-            'Content-Type': 'text/plain;charset=utf-8',
-            'Transfer-Encoding': 'chunked',
-            'Cache-Control': 'no-transform',
-        });
-
-        const botObject = client.bots[bot];
-        const canSuggestReplies = botObject?.defaultBotObject?.hasSuggestedReplies ?? false;
-
-        if (!canSuggestReplies) {
-            return response.end();
-        }
-
-        // Store replies that have already been sent to the user
-        const repliesSent = new Set();
-        // Store the time when the request started
-        const beginAt = Date.now();
-        while (true) {
-            // If more than 5 seconds have passed, stop suggesting replies
-            if (Date.now() - beginAt > 5000) {
-                break;
-            }
-
-            // Get replies array from the Poe client
-            const suggestedReplies = client.suggested_replies[messageId];
-
-            // If the suggested replies array is not an array, wait 100ms and try again
-            if (!Array.isArray(suggestedReplies)) {
-                await delay(100);
-                continue;
-            }
-
-            // If there are no replies, wait 100ms and try again
-            if (suggestedReplies.length === 0) {
-                await delay(100);
-                continue;
-            }
-
-            // Send each reply to the user
-            for (const reply of suggestedReplies) {
-                // If the reply has already been sent, skip it
-                if (repliesSent.has(reply)) {
-                    continue;
-                }
-
-                // Add the reply to the list of replies that have been sent
-                repliesSent.add(reply);
-                // Write SSE event to the response stream
-                response.write(reply + '\n\n');
-            }
-
-            // Wait 100ms before checking for new replies
-            await delay(100);
-        }
-
-        //client.disconnect_ws();
-        return response.end();
-    }
-    catch (err) {
-        console.error(err);
-
-        if (response.headersSent === false) {
-            return response.sendStatus(401);
-        } else {
-            return response.end();
-        }
-    }
-
-
 });
 
 /**
@@ -2924,7 +2919,7 @@ async function generateThumbnail(type, file) {
             buffer = fs.readFileSync(pathToOriginalFile);
         }
 
-        fs.writeFileSync(pathToCachedFile, buffer);
+        writeFileAtomicSync(pathToCachedFile, buffer);
     }
     catch (outer) {
         return null;
@@ -2974,7 +2969,7 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
 
     if (request.body.use_openrouter == false) {
         api_url = new URL(request.body.reverse_proxy || api_openai).toString();
-        api_key_openai = readSecret(SECRET_KEYS.OPENAI);
+        api_key_openai = request.body.reverse_proxy ? request.body.proxy_password : readSecret(SECRET_KEYS.OPENAI);
         headers = {};
     } else {
         api_url = 'https://openrouter.ai/api/v1';
@@ -2983,7 +2978,7 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
         headers = { 'HTTP-Referer': request.headers.referer };
     }
 
-    if (!api_key_openai) {
+    if (!api_key_openai && !request.body.reverse_proxy) {
         return response_getstatus_openai.status(401).send({ error: true });
     }
 
@@ -2996,8 +2991,22 @@ app.post("/getstatus_openai", jsonParser, function (request, response_getstatus_
     client.get(api_url + "/models", args, function (data, response) {
         if (response.statusCode == 200) {
             response_getstatus_openai.send(data);
-            const modelIds = data?.data?.map(x => x.id)?.sort();
-            console.log('Available OpenAI models:', modelIds);
+            if (request.body.use_openrouter) {
+                let models = [];
+                data.data.forEach(model => {
+                    const context_length = model.context_length;
+                    const tokens_dollar = parseFloat(1 / (1000 * model.pricing.prompt));
+                    const tokens_rounded = (Math.round(tokens_dollar * 1000) / 1000).toFixed(0);
+                    models[model.id] = {
+                        tokens_per_dollar: tokens_rounded + 'k',
+                        context_length: context_length,
+                    };
+                });
+                console.log('Available OpenRouter models:', models);
+            } else {
+                const modelIds = data?.data?.map(x => x.id)?.sort();
+                console.log('Available OpenAI models:', modelIds);
+            }
         }
         if (response.statusCode == 401) {
             console.log('Access Token is incorrect.');
@@ -3050,42 +3059,6 @@ app.post("/openai_bias", jsonParser, async function (request, response) {
     // not needed for cached tokenizers
     //tokenizer.free();
     return response.send(result);
-});
-
-// Shamelessly stolen from Agnai
-app.post("/openai_usage", jsonParser, async function (request, response) {
-    if (!request.body) return response.sendStatus(400);
-    const key = readSecret(SECRET_KEYS.OPENAI);
-
-    if (!key) {
-        console.warn('Get key usage failed: Missing OpenAI API key.');
-        return response.sendStatus(401);
-    }
-
-    const api_url = new URL(request.body.reverse_proxy || api_openai).toString();
-
-    const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-    };
-
-    const date = new Date();
-    date.setDate(1);
-    const start_date = date.toISOString().slice(0, 10);
-
-    date.setMonth(date.getMonth() + 1);
-    const end_date = date.toISOString().slice(0, 10);
-
-    try {
-        const res = await getAsync(
-            `${api_url}/dashboard/billing/usage?start_date=${start_date}&end_date=${end_date}`,
-            { headers },
-        );
-        return response.send(res);
-    }
-    catch {
-        return response.sendStatus(400);
-    }
 });
 
 app.post("/deletepreset_openai", jsonParser, function (request, response) {
@@ -3216,7 +3189,7 @@ async function sendClaudeRequest(request, response) {
     const fetch = require('node-fetch').default;
 
     const api_url = new URL(request.body.reverse_proxy || api_claude).toString();
-    const api_key_claude = readSecret(SECRET_KEYS.CLAUDE);
+    const api_key_claude = request.body.reverse_proxy ? request.body.proxy_password : readSecret(SECRET_KEYS.CLAUDE);
 
     if (!api_key_claude) {
         return response.status(401).send({ error: true });
@@ -3229,7 +3202,12 @@ async function sendClaudeRequest(request, response) {
             controller.abort();
         });
 
-        const requestPrompt = convertClaudePrompt(request.body.messages, true, true);
+        let requestPrompt = convertClaudePrompt(request.body.messages, true, true);
+
+        if (request.body.assistant_prefill) {
+            requestPrompt += request.body.assistant_prefill;
+        }
+
         console.log('Claude request:', requestPrompt);
 
         const generateResponse = await fetch(api_url + '/complete', {
@@ -3302,19 +3280,22 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
     let api_url;
     let api_key_openai;
     let headers;
+    let bodyParams;
 
     if (!request.body.use_openrouter) {
         api_url = new URL(request.body.reverse_proxy || api_openai).toString();
-        api_key_openai = readSecret(SECRET_KEYS.OPENAI);
+        api_key_openai = request.body.reverse_proxy ? request.body.proxy_password : readSecret(SECRET_KEYS.OPENAI);
         headers = {};
+        bodyParams = {};
     } else {
         api_url = 'https://openrouter.ai/api/v1';
         api_key_openai = readSecret(SECRET_KEYS.OPENROUTER);
         // OpenRouter needs to pass the referer: https://openrouter.ai/docs
         headers = { 'HTTP-Referer': request.headers.referer };
+        bodyParams = { 'transforms': ["middle-out"] };
     }
 
-    if (!api_key_openai) {
+    if (!api_key_openai && !request.body.reverse_proxy) {
         return response_generate_openai.status(401).send({ error: true });
     }
 
@@ -3348,7 +3329,8 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
             "top_p": request.body.top_p,
             "top_k": request.body.top_k,
             "stop": request.body.stop,
-            "logit_bias": request.body.logit_bias
+            "logit_bias": request.body.logit_bias,
+            ...bodyParams,
         },
         signal: controller.signal,
     };
@@ -3386,7 +3368,22 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
                     makeRequest(config, response_generate_openai, request, retries - 1);
                 }, timeout);
             } else {
-                handleError(error, response_generate_openai, request);
+                let errorData = error?.response?.data;
+
+                if (request.body.stream) {
+                    try {
+                        const chunks = await readAllChunks(errorData);
+                        const blob = new Blob(chunks, { type: 'application/json' });
+                        const text = await blob.text();
+                        errorData = JSON.parse(text);
+                    } catch {
+                        console.warn('Error parsing streaming response');
+                    }
+                } else {
+                    errorData = typeof errorData === 'string' ? tryParse(errorData) : errorData;
+                }
+
+                handleError(error, response_generate_openai, errorData);
             }
         }
     }
@@ -3398,11 +3395,33 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
         }
     }
 
-    function handleError(error, response_generate_openai, request) {
-        console.error('Error:', error.message);
-        const quota_error = error?.response?.status === 429 && error?.response?.data?.error?.type === 'insufficient_quota';
+    function handleError(error, response_generate_openai, errorData) {
+        console.error('Error:', error?.message);
+
+        let message = error?.response?.statusText;
+
+        const statusMessages = {
+            400: 'Bad request',
+            401: 'Unauthorized',
+            402: 'Credit limit reached',
+            403: 'Forbidden',
+            404: 'Not found',
+            429: 'Too many requests',
+            451: 'Unavailable for legal reasons',
+        };
+
+        const status = error?.response?.status;
+        if (statusMessages.hasOwnProperty(status)) {
+            message = errorData?.error?.message || statusMessages[status];
+            console.log(message);
+        }
+
+        const quota_error = error?.response?.status === 429 && errorData?.error?.type === 'insufficient_quota';
+        const response = { error: { message }, quota_error: quota_error }
         if (!response_generate_openai.headersSent) {
-            response_generate_openai.send({ error: true, quota_error: quota_error });
+            response_generate_openai.send(response);
+        } else if (!response_generate_openai.writableEnded) {
+            response_generate_openai.write(response);
         }
     }
 
@@ -3447,6 +3466,47 @@ app.post("/tokenize_openai", jsonParser, function (request, response_tokenize_op
     response_tokenize_openai.send({ "token_count": num_tokens });
 });
 
+app.post("/save_preset", jsonParser, function (request, response) {
+    const name = sanitize(request.body.name);
+    if (!request.body.preset || !name) {
+        return response.sendStatus(400);
+    }
+
+    const filename = `${name}.settings`;
+    const directory = getPresetFolderByApiId(request.body.apiId);
+
+    if (!directory) {
+        return response.sendStatus(400);
+    }
+
+    const fullpath = path.join(directory, filename);
+    writeFileAtomicSync(fullpath, JSON.stringify(request.body.preset, null, 4), 'utf-8');
+    return response.send({ name });
+});
+
+app.post("/delete_preset", jsonParser, function (request, response) {
+    const name = sanitize(request.body.name);
+    if (!name) {
+        return response.sendStatus(400);
+    }
+
+    const filename = `${name}.settings`;
+    const directory = getPresetFolderByApiId(request.body.apiId);
+
+    if (!directory) {
+        return response.sendStatus(400);
+    }
+
+    const fullpath = path.join(directory, filename);
+
+    if (fs.existsSync) {
+        fs.unlinkSync(fullpath);
+        return response.sendStatus(200);
+    } else {
+        return response.sendStatus(404);
+    }
+});
+
 app.post("/savepreset_openai", jsonParser, function (request, response) {
     const name = sanitize(request.query.name);
     if (!request.body || !name) {
@@ -3455,9 +3515,23 @@ app.post("/savepreset_openai", jsonParser, function (request, response) {
 
     const filename = `${name}.settings`;
     const fullpath = path.join(directories.openAI_Settings, filename);
-    fs.writeFileSync(fullpath, JSON.stringify(request.body, null, 4), 'utf-8');
+    writeFileAtomicSync(fullpath, JSON.stringify(request.body, null, 4), 'utf-8');
     return response.send({ name });
 });
+
+function getPresetFolderByApiId(apiId) {
+    switch (apiId) {
+        case 'kobold':
+        case 'koboldhorde':
+            return directories.koboldAI_Settings;
+        case 'novel':
+            return directories.novelAI_Settings;
+        case 'textgenerationwebui':
+            return directories.textGen_Settings;
+        default:
+            return null;
+    }
+}
 
 function createTokenizationHandler(getTokenizerFn) {
     return async function (request, response) {
@@ -3467,15 +3541,15 @@ function createTokenizationHandler(getTokenizerFn) {
 
         const text = request.body.text || '';
         const tokenizer = getTokenizerFn();
-        const count = await countSentencepieceTokens(tokenizer, text);
-        return response.send({ count });
+        const { ids, count } = await countSentencepieceTokens(tokenizer, text);
+        return response.send({ ids, count });
     };
 }
 
 app.post("/tokenize_llama", jsonParser, createTokenizationHandler(() => spp_llama));
 app.post("/tokenize_nerdstash", jsonParser, createTokenizationHandler(() => spp_nerd));
 app.post("/tokenize_nerdstash_v2", jsonParser, createTokenizationHandler(() => spp_nerd_v2));
-app.post("/tokenize_via_api", jsonParser, async function(request, response) {
+app.post("/tokenize_via_api", jsonParser, async function (request, response) {
     if (!request.body) {
         return response.sendStatus(400);
     }
@@ -3483,9 +3557,13 @@ app.post("/tokenize_via_api", jsonParser, async function(request, response) {
 
     try {
         const args = {
-            body: JSON.stringify({"prompt": text}),
+            body: JSON.stringify({ "prompt": text }),
             headers: { "Content-Type": "application/json" }
         };
+
+        if (main_api == 'textgenerationwebui' && request.body.use_mancer) {
+            args.headers = Object.assign(args.headers, get_mancer_headers());
+        }
 
         const data = await postAsync(api_server + "/v1/token-count", args);
         console.log(data);
@@ -3498,17 +3576,6 @@ app.post("/tokenize_via_api", jsonParser, async function(request, response) {
 
 
 // ** REST CLIENT ASYNC WRAPPERS **
-
-function putAsync(url, args) {
-    return new Promise((resolve, reject) => {
-        client.put(url, args, (data, response) => {
-            if (response.statusCode >= 400) {
-                reject(data);
-            }
-            resolve(data);
-        }).on('error', e => reject(e));
-    })
-}
 
 async function postAsync(url, args) {
     const fetch = require('node-fetch').default;
@@ -3555,6 +3622,7 @@ const setupTasks = async function () {
     migrateSecrets();
     ensurePublicDirectoriesExist();
     await ensureThumbnailCache();
+    contentManager.checkForNewContent();
 
     // Colab users could run the embedded tool
     if (!is_colab) await convertWebp();
@@ -3566,10 +3634,23 @@ const setupTasks = async function () {
         loadClaudeTokenizer('src/claude.json'),
     ]);
 
+    await statsHelpers.loadStatsFile(directories.chats, directories.characters);
+
+    // Set up event listeners for a graceful shutdown
+    process.on('SIGINT', statsHelpers.writeStatsToFileAndExit);
+    process.on('SIGTERM', statsHelpers.writeStatsToFileAndExit);
+    process.on('uncaughtException', (err) => {
+        console.error('Uncaught exception:', err);
+        statsHelpers.writeStatsToFileAndExit();
+    });
+
+    setInterval(statsHelpers.saveStatsToFile, 5 * 60 * 1000);
+
     console.log('Launching...');
 
     if (autorun) open(autorunUrl.toString());
-    console.log('SillyTavern is listening on: ' + tavernUrl);
+    
+    console.log('\x1b[32mSillyTavern is listening on: ' + tavernUrl + '\x1b[0m');
 
     if (listen) {
         console.log('\n0.0.0.0 means SillyTavern is listening on all network interfaces (Wi-Fi, LAN, localhost). If you want to limit it only to internal localhost (127.0.0.1), change the setting in config.conf to “listen=false”\n');
@@ -3690,8 +3771,8 @@ const SECRETS_FILE = './secrets.json';
 const SETTINGS_FILE = './public/settings.json';
 const SECRET_KEYS = {
     HORDE: 'api_key_horde',
+    MANCER: 'api_key_mancer',
     OPENAI: 'api_key_openai',
-    POE: 'api_key_poe',
     NOVEL: 'api_key_novel',
     CLAUDE: 'api_key_claude',
     DEEPL: 'deepl',
@@ -3711,7 +3792,6 @@ function migrateSecrets() {
         const settings = JSON.parse(fileContents);
         const oaiKey = settings?.api_key_openai;
         const hordeKey = settings?.horde_settings?.api_key;
-        const poeKey = settings?.poe_settings?.token;
         const novelKey = settings?.api_key_novel;
 
         if (typeof oaiKey === 'string') {
@@ -3728,13 +3808,6 @@ function migrateSecrets() {
             modified = true;
         }
 
-        if (typeof poeKey === 'string') {
-            console.log('Migrating Poe key...');
-            writeSecret(SECRET_KEYS.POE, poeKey);
-            delete settings.poe_settings.token;
-            modified = true;
-        }
-
         if (typeof novelKey === 'string') {
             console.log('Migrating Novel key...');
             writeSecret(SECRET_KEYS.NOVEL, novelKey);
@@ -3745,7 +3818,7 @@ function migrateSecrets() {
         if (modified) {
             console.log('Writing updated settings.json...');
             const settingsContent = JSON.stringify(settings);
-            fs.writeFileSync(SETTINGS_FILE, settingsContent, "utf-8");
+            writeFileAtomicSync(SETTINGS_FILE, settingsContent, "utf-8");
         }
     }
     catch (error) {
@@ -3830,6 +3903,7 @@ app.post('/viewsecrets', jsonParser, async (_, response) => {
 
 app.post('/horde_samplers', jsonParser, async (_, response) => {
     try {
+        const ai_horde = getHordeClient();
         const samplers = Object.values(ai_horde.ModelGenerationInputStableSamplers);
         response.send(samplers);
     } catch (error) {
@@ -3840,6 +3914,7 @@ app.post('/horde_samplers', jsonParser, async (_, response) => {
 
 app.post('/horde_models', jsonParser, async (_, response) => {
     try {
+        const ai_horde = getHordeClient();
         const models = await ai_horde.getModels();
         response.send(models);
     } catch (error) {
@@ -3856,6 +3931,7 @@ app.post('/horde_userinfo', jsonParser, async (_, response) => {
     }
 
     try {
+        const ai_horde = getHordeClient();
         const user = await ai_horde.findUser({ token: api_key_horde });
         return response.send(user);
     } catch (error) {
@@ -3871,6 +3947,7 @@ app.post('/horde_generateimage', jsonParser, async (request, response) => {
     console.log('Stable Horde request:', request.body);
 
     try {
+        const ai_horde = getHordeClient();
         const generation = await ai_horde.postAsyncImageGenerate(
             {
                 prompt: `${request.body.prompt_prefix} ${request.body.prompt} ### ${request.body.negative_prompt}`,
@@ -4112,7 +4189,7 @@ app.post('/upload_sprite_pack', urlencodedParser, async (request, response) => {
 
             // Write sprite buffer to disk
             const pathToSprite = path.join(spritesPath, filename);
-            fs.writeFileSync(pathToSprite, buffer);
+            writeFileAtomicSync(pathToSprite, buffer);
         }
 
         // Remove uploaded ZIP file
@@ -4337,7 +4414,7 @@ function importRisuSprites(data) {
 
             const filename = label + '.png';
             const pathToFile = path.join(spritesPath, filename);
-            fs.writeFileSync(pathToFile, fileBase64, { encoding: 'base64' });
+            writeFileAtomicSync(pathToFile, fileBase64, { encoding: 'base64' });
         }
 
         // Remove additionalAssets and emotions from data (they are now in the sprites folder)
@@ -4351,13 +4428,13 @@ function importRisuSprites(data) {
 function writeSecret(key, value) {
     if (!fs.existsSync(SECRETS_FILE)) {
         const emptyFile = JSON.stringify({});
-        fs.writeFileSync(SECRETS_FILE, emptyFile, "utf-8");
+        writeFileAtomicSync(SECRETS_FILE, emptyFile, "utf-8");
     }
 
     const fileContents = fs.readFileSync(SECRETS_FILE);
     const secrets = JSON.parse(fileContents);
     secrets[key] = value;
-    fs.writeFileSync(SECRETS_FILE, JSON.stringify(secrets), "utf-8");
+    writeFileAtomicSync(SECRETS_FILE, JSON.stringify(secrets), "utf-8");
 }
 
 function readSecret(key) {
@@ -4461,22 +4538,22 @@ async function getManifest(extensionPath) {
 }
 
 async function checkIfRepoIsUpToDate(extensionPath) {
-  const git = simpleGit();
-  await git.cwd(extensionPath).fetch('origin');
-  const currentBranch = await git.cwd(extensionPath).branch();
-  const currentCommitHash = await git.cwd(extensionPath).revparse(['HEAD']);
-  const log = await git.cwd(extensionPath).log({
-    from: currentCommitHash,
-    to: `origin/${currentBranch.current}`,
-  });
+    const git = simpleGit();
+    await git.cwd(extensionPath).fetch('origin');
+    const currentBranch = await git.cwd(extensionPath).branch();
+    const currentCommitHash = await git.cwd(extensionPath).revparse(['HEAD']);
+    const log = await git.cwd(extensionPath).log({
+        from: currentCommitHash,
+        to: `origin/${currentBranch.current}`,
+    });
 
-  // Fetch remote repository information
-  const remotes = await git.cwd(extensionPath).getRemotes(true);
+    // Fetch remote repository information
+    const remotes = await git.cwd(extensionPath).getRemotes(true);
 
-  return {
-    isUpToDate: log.total === 0,
-    remoteUrl: remotes[0].refs.fetch, // URL of the remote repository
-  };
+    return {
+        isUpToDate: log.total === 0,
+        remoteUrl: remotes[0].refs.fetch, // URL of the remote repository
+    };
 }
 
 
@@ -4591,7 +4668,7 @@ app.post('/get_extension_version', jsonParser, async (request, response) => {
         const extensionPath = path.join(directories.extensions, 'third-party', extensionName);
 
         if (!fs.existsSync(extensionPath)) {
-        return response.status(404).send(`Directory does not exist at ${extensionPath}`);
+            return response.status(404).send(`Directory does not exist at ${extensionPath}`);
         }
 
         const currentBranch = await git.cwd(extensionPath).branch();
@@ -4608,7 +4685,7 @@ app.post('/get_extension_version', jsonParser, async (request, response) => {
         console.log('Getting extension version failed', error);
         return response.status(500).send(`Server Error: ${error.message}`);
     }
-    }
+}
 );
 
 /**
