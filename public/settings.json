@@ -4,13 +4,13 @@
     "active_character": "mjv2uv.png",
     "active_group": null,
     "api_server": "http://localhost:5000/api",
-    "api_server_textgenerationwebui": "http://127.0.0.1:7860",
+    "api_server_textgenerationwebui": "http://127.0.0.1:7860/api",
     "api_use_mancer_webui": false,
     "preset_settings": "Classic-Pygmalion-6b",
     "user_avatar": "legat.png",
     "amount_gen": 520,
     "max_context": 2304,
-    "main_api": "novel",
+    "main_api": "textgenerationwebui",
     "world_info_settings": {
         "world_info": {
             "globalSelect": []

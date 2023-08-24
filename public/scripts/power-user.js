@@ -8,24 +8,26 @@ import {
     reloadCurrentChat,
     getRequestHeaders,
     substituteParams,
-    updateVisibleDivs,
     eventSource,
     event_types,
     getCurrentChatId,
     printCharacters,
-    name1,
-    name2,
     setCharacterId,
     setEditedMessageId
 } from "../script.js";
-import { favsToHotswap, isMobile, initMovingUI } from "./RossAscends-mods.js";
+import { isMobile, initMovingUI } from "./RossAscends-mods.js";
 import {
     groups,
     resetSelectedGroup,
-    selected_group,
 } from "./group-chats.js";
+import {
+    instruct_presets,
+    loadInstructMode,
+    selectInstructPreset,
+} from "./instruct-mode.js";
 
 import { registerSlashCommand } from "./slash-commands.js";
+import { tokenizers } from "./tokenizers.js";
 
 import { delay } from "./utils.js";
 
@@ -34,21 +36,17 @@ export {
     loadMovingUIState,
     collapseNewlines,
     playMessageSound,
-    sortGroupMembers,
-    sortCharactersList,
+    sortEntitiesList,
     fixMarkdown,
     power_user,
     pygmalion_options,
-    tokenizers,
     send_on_enter_options,
 };
 
 export const MAX_CONTEXT_DEFAULT = 4096;
 const MAX_CONTEXT_UNLOCKED = 65536;
 
-const defaultStoryString = `{{#if description}}{{description}}{{/if}}
-{{#if personality}}{{personality}}{{/if}}
-{{#if scenario}}Scenario: {{scenario}}{{/if}}`;
+const defaultStoryString =  "{{#if system}}{{system}}\n{{/if}}{{#if description}}{{description}}\n{{/if}}{{#if personality}}{{char}}'s personality: {{personality}}\n{{/if}}{{#if scenario}}Scenario: {{scenario}}\n{{/if}}{{#if persona}}{{persona}}\n{{/if}}";
 const defaultExampleSeparator = '***';
 const defaultChatStart = '***';
 
@@ -67,17 +65,6 @@ const pygmalion_options = {
     DISABLED: -1,
     AUTO: 0,
     ENABLED: 1,
-}
-
-const tokenizers = {
-    NONE: 0,
-    GPT3: 1,
-    CLASSIC: 2,
-    LLAMA: 3,
-    NERD: 4,
-    NERD2: 5,
-    API: 6,
-    BEST_MATCH: 99,
 }
 
 const send_on_enter_options = {
@@ -99,6 +86,7 @@ let power_user = {
     collapse_newlines: false,
     pygmalion_formatting: pygmalion_options.AUTO,
     pin_examples: false,
+    strip_examples: false,
     trim_sentences: false,
     include_newline: false,
     always_force_name2: false,
@@ -163,10 +151,11 @@ let power_user = {
     max_context_unlocked: false,
     prefer_character_prompt: true,
     prefer_character_jailbreak: true,
-    continue_on_send: false,
+    quick_continue: false,
     trim_spaces: true,
     relaxed_api_urls: false,
 
+    default_instruct: '',
     instruct: {
         enabled: false,
         wrap: true,
@@ -181,6 +170,7 @@ let power_user = {
         separator_sequence: '',
         macro: false,
         names_force_groups: true,
+        activation_regex: '',
     },
 
     context: {
@@ -207,11 +197,9 @@ let power_user = {
 
 let themes = [];
 let movingUIPresets = [];
-let instruct_presets = [];
-let context_presets = [];
+export let context_presets = [];
 
 const storage_keys = {
-    ui_language: "language",
     fast_ui_mode: "TavernAI_fast_ui_mode",
     avatar_style: "TavernAI_avatar_style",
     chat_display: "TavernAI_chat_display",
@@ -251,29 +239,42 @@ function playMessageSound() {
     }
 
     const audio = document.getElementById('audio_message_sound');
-    audio.volume = 0.8;
-    audio.pause();
-    audio.currentTime = 0;
-    audio.play();
+    if (audio instanceof HTMLAudioElement) {
+        audio.volume = 0.8;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.play();
+    }
 }
 
+/**
+ * Replaces consecutive newlines with a single newline.
+ * @param {string} x String to be processed.
+ * @returns {string} Processed string.
+ * @example
+ * collapseNewlines("\n\n\n"); // "\n"
+ */
 function collapseNewlines(x) {
     return x.replaceAll(/\n+/g, "\n");
 }
 
+/**
+ * Fix formatting problems in markdown.
+ * @param {string} text Text to be processed.
+ * @returns {string} Processed text.
+ * @example
+ * "^example * text*\n" // "^example *text*\n"
+ *  "^*example * text\n"// "^*example* text\n"
+ * "^example *text *\n" // "^example *text*\n"
+ * "^* example * text\n" // "^*example* text\n"
+ * // take note that the side you move the asterisk depends on where its pairing is
+ * // i.e. both of the following strings have the same broken asterisk ' * ',
+ * // but you move the first to the left and the second to the right, to match the non-broken asterisk
+ * "^example * text*\n" // "^*example * text\n"
+ * // and you HAVE to handle the cases where multiple pairs of asterisks exist in the same line
+ * "^example * text* * harder problem *\n" // "^example *text* *harder problem*\n"
+ */
 function fixMarkdown(text) {
-    // fix formatting problems in markdown
-    // e.g.:
-    // "^example * text*\n" -> "^example *text*\n"
-    // "^*example * text\n" -> "^*example* text\n"
-    // "^example *text *\n" -> "^example *text*\n"
-    // "^* example * text\n" -> "^*example* text\n"
-    // take note that the side you move the asterisk depends on where its pairing is
-    // i.e. both of the following strings have the same broken asterisk ' * ',
-    // but you move the first to the left and the second to the right, to match the non-broken asterisk "^example * text*\n" "^*example * text\n"
-    // and you HAVE to handle the cases where multiple pairs of asterisks exist in the same line
-    // i.e. "^example * text* * harder problem *\n" -> "^example *text* *harder problem*\n"
-
     // Find pairs of formatting characters and capture the text in between them
     const format = /([\*_]{1,2})([\s\S]*?)\1/gm;
     let matches = [];
@@ -667,9 +668,6 @@ function loadPowerUserSettings(settings, data) {
         movingUIPresets = data.movingUIPresets;
     }
 
-    if (data.instruct !== undefined) {
-        instruct_presets = data.instruct;
-    }
 
     if (data.context !== undefined) {
         context_presets = data.context;
@@ -710,7 +708,8 @@ function loadPowerUserSettings(settings, data) {
 
     $('#relaxed_api_urls').prop("checked", power_user.relaxed_api_urls);
     $('#trim_spaces').prop("checked", power_user.trim_spaces);
-    $('#continue_on_send').prop("checked", power_user.continue_on_send);
+    $('#quick_continue').prop("checked", power_user.quick_continue);
+    $('#mes_continue').css('display', power_user.quick_continue ? '' : 'none');
     $('#auto_swipe').prop("checked", power_user.auto_swipe);
     $('#auto_swipe_minimum_length').val(power_user.auto_swipe_minimum_length);
     $('#auto_swipe_blacklist').val(power_user.auto_swipe_blacklist.join(", "));
@@ -733,6 +732,7 @@ function loadPowerUserSettings(settings, data) {
     $("#spoiler_free_mode").prop("checked", power_user.spoiler_free_mode);
     $("#collapse-newlines-checkbox").prop("checked", power_user.collapse_newlines);
     $("#pin-examples-checkbox").prop("checked", power_user.pin_examples);
+    $("#remove-examples-checkbox").prop("checked", power_user.strip_examples);
     $("#always-force-name2-checkbox").prop("checked", power_user.always_force_name2);
     $("#trim_sentences_checkbox").prop("checked", power_user.trim_sentences);
     $("#include_newline_checkbox").prop("checked", power_user.include_newline);
@@ -803,20 +803,18 @@ function loadPowerUserSettings(settings, data) {
 
 
     $(`#character_sort_order option[data-order="${power_user.sort_order}"][data-field="${power_user.sort_field}"]`).prop("selected", true);
-    sortCharactersList();
     reloadMarkdownProcessor(power_user.render_formulas);
-    loadInstructMode();
+    loadInstructMode(data);
     loadContextSettings();
     loadMaxContextUnlocked();
     switchWaifuMode();
     switchSpoilerMode();
     loadMovingUIState();
     loadCharListState();
-
 }
 
 async function loadCharListState() {
-    if (document.getElementById('CharID0') !== null) {
+    if (document.querySelector('.character_select') !== null) {
         console.debug('setting charlist state to...')
         if (power_user.charListGrid === true) {
             console.debug('..to grid')
@@ -907,7 +905,7 @@ function loadContextSettings() {
     });
 
     $('#context_presets').on('change', function () {
-        const name = $(this).find(':selected').val();
+        const name = String($(this).find(':selected').val());
         const preset = context_presets.find(x => x.name === name);
 
         if (!preset) {
@@ -927,74 +925,15 @@ function loadContextSettings() {
                 }
             }
         });
-    });
-}
 
-function loadInstructMode() {
-    const controls = [
-        { id: "instruct_enabled", property: "enabled", isCheckbox: true },
-        { id: "instruct_wrap", property: "wrap", isCheckbox: true },
-        { id: "instruct_system_prompt", property: "system_prompt", isCheckbox: false },
-        { id: "instruct_system_sequence", property: "system_sequence", isCheckbox: false },
-        { id: "instruct_separator_sequence", property: "separator_sequence", isCheckbox: false },
-        { id: "instruct_input_sequence", property: "input_sequence", isCheckbox: false },
-        { id: "instruct_output_sequence", property: "output_sequence", isCheckbox: false },
-        { id: "instruct_stop_sequence", property: "stop_sequence", isCheckbox: false },
-        { id: "instruct_names", property: "names", isCheckbox: true },
-        { id: "instruct_macro", property: "macro", isCheckbox: true },
-        { id: "instruct_names_force_groups", property: "names_force_groups", isCheckbox: true },
-        { id: "instruct_last_output_sequence", property: "last_output_sequence", isCheckbox: false },
-    ];
-
-    if (power_user.instruct.names_force_groups === undefined) {
-        power_user.instruct.names_force_groups = true;
-    }
-
-    controls.forEach(control => {
-        const $element = $(`#${control.id}`);
-
-        if (control.isCheckbox) {
-            $element.prop('checked', power_user.instruct[control.property]);
-        } else {
-            $element.val(power_user.instruct[control.property]);
-        }
-
-        $element.on('input', function () {
-            power_user.instruct[control.property] = control.isCheckbox ? !!$(this).prop('checked') : $(this).val();
-            saveSettingsDebounced();
-        });
-    });
-
-    instruct_presets.forEach((preset) => {
-        const name = preset.name;
-        const option = document.createElement('option');
-        option.value = name;
-        option.innerText = name;
-        option.selected = name === power_user.instruct.preset;
-        $('#instruct_presets').append(option);
-    });
-
-    $('#instruct_presets').on('change', function () {
-        const name = $(this).find(':selected').val();
-        const preset = instruct_presets.find(x => x.name === name);
-
-        if (!preset) {
-            return;
-        }
-
-        power_user.instruct.preset = name;
-        controls.forEach(control => {
-            if (preset[control.property] !== undefined) {
-                power_user.instruct[control.property] = preset[control.property];
-                const $element = $(`#${control.id}`);
-
-                if (control.isCheckbox) {
-                    $element.prop('checked', power_user.instruct[control.property]).trigger('input');
-                } else {
-                    $element.val(power_user.instruct[control.property]).trigger('input');
-                }
+        // Select matching instruct preset
+        for (const instruct_preset of instruct_presets) {
+            // If instruct preset matches the context template
+            if (instruct_preset.name === name) {
+                selectInstructPreset(instruct_preset.name);
+                break;
             }
-        });
+        }
     });
 }
 
@@ -1021,6 +960,25 @@ export function fuzzySearchCharacters(searchValue) {
     console.debug('Characters fuzzy search results for ' + searchValue, results);
     const indices = results.map(x => x.refIndex);
     return indices;
+}
+
+export function fuzzySearchWorldInfo(data, searchValue) {
+    const fuse = new Fuse(data, {
+        keys: [
+            { name: 'key', weight: 3 },
+            { name: 'content', weight: 3 },
+            { name: 'comment', weight: 2 },
+            { name: 'keysecondary', weight: 2 },
+            { name: 'uid', weight: 1 },
+        ],
+        includeScore: true,
+        ignoreLocation: true,
+        threshold: 0.2,
+    });
+
+    const results = fuse.search(searchValue);
+    console.debug('World Info fuzzy search results for ' + searchValue, results);
+    return results.map(x => x.item?.uid);
 }
 
 export function fuzzySearchGroups(searchValue) {
@@ -1054,58 +1012,6 @@ export function renderStoryString(params) {
     }
 }
 
-export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar, name1, name2) {
-    let includeNames = isNarrator ? false : power_user.instruct.names;
-
-    if (!isNarrator && power_user.instruct.names_force_groups && (selected_group || forceAvatar)) {
-        includeNames = true;
-    }
-
-    let sequence = (isUser || isNarrator) ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
-
-    if (power_user.instruct.macro) {
-        sequence = substituteParams(sequence, name1, name2);
-    }
-
-    const separator = power_user.instruct.wrap ? '\n' : '';
-    const separatorSequence = power_user.instruct.separator_sequence && !isUser
-        ? power_user.instruct.separator_sequence
-        : (power_user.instruct.wrap ? '\n' : '');
-    const textArray = includeNames ? [sequence, `${name}: ${mes}`, separatorSequence] : [sequence, mes, separatorSequence];
-    const text = textArray.filter(x => x).join(separator);
-    return text;
-}
-
-export function formatInstructStoryString(story, systemPrompt) {
-    // If the character has a custom system prompt AND user has it preferred, use that instead of the default
-    systemPrompt = power_user.prefer_character_prompt && systemPrompt ? systemPrompt : power_user.instruct.system_prompt;
-    const sequence = power_user.instruct.system_sequence || '';
-    const prompt = substituteParams(systemPrompt, name1, name2, power_user.instruct.system_prompt) || '';
-    const separator = power_user.instruct.wrap ? '\n' : '';
-    const textArray = [sequence, prompt + '\n' + story];
-    const text = textArray.filter(x => x).join(separator);
-    return text;
-}
-
-export function formatInstructModePrompt(name, isImpersonate, promptBias, name1, name2) {
-    const includeNames = power_user.instruct.names || (!!selected_group && power_user.instruct.names_force_groups);
-    const getOutputSequence = () => power_user.instruct.last_output_sequence || power_user.instruct.output_sequence;
-    let sequence = isImpersonate ? power_user.instruct.input_sequence : getOutputSequence();
-
-    if (power_user.instruct.macro) {
-        sequence = substituteParams(sequence, name1, name2);
-    }
-
-    const separator = power_user.instruct.wrap ? '\n' : '';
-    let text = includeNames ? (separator + sequence + separator + `${name}:`) : (separator + sequence);
-
-    if (!isImpersonate && promptBias) {
-        text += (includeNames ? promptBias : (separator + promptBias));
-    }
-
-    return text.trimEnd();
-}
-
 const sortFunc = (a, b) => power_user.sort_order == 'asc' ? compareFunc(a, b) : compareFunc(b, a);
 const compareFunc = (first, second) => {
     if (power_user.sort_order == 'random') {
@@ -1129,44 +1035,16 @@ const compareFunc = (first, second) => {
     }
 };
 
-function sortCharactersList() {
-    const arr1 = groups.map(x => ({
-        item: x,
-        id: x.id,
-        selector: '.group_select',
-        attribute: 'grid',
-    }))
-    const arr2 = characters.map((x, index) => ({
-        item: x,
-        id: index,
-        selector: '.character_select',
-        attribute: 'chid',
-    }));
-
-    const array = [...arr1, ...arr2];
-
-    if (power_user.sort_field == undefined || array.length === 0) {
+/**
+ * Sorts an array of entities based on the current sort settings
+ * @param {any[]} entities An array of objects with an `item` property
+ */
+function sortEntitiesList(entities) {
+    if (power_user.sort_field == undefined || entities.length === 0) {
         return;
     }
 
-    let orderedList = array.slice().sort((a, b) => sortFunc(a.item, b.item));
-
-    for (const item of array) {
-        $(`${item.selector}[${item.attribute}="${item.id}"]`).css({ 'order': orderedList.indexOf(item) });
-    }
-    updateVisibleDivs('#rm_print_characters_block', true);
-}
-
-function sortGroupMembers(selector) {
-    if (power_user.sort_field == undefined || characters.length === 0) {
-        return;
-    }
-
-    let orderedList = characters.slice().sort(sortFunc);
-
-    for (let i = 0; i < characters.length; i++) {
-        $(`${selector}[chid="${i}"]`).css({ 'order': orderedList.indexOf(characters[i]) });
-    }
+    entities.sort((a, b) => sortFunc(a.item, b.item));
 }
 
 async function saveTheme() {
@@ -1392,8 +1270,8 @@ async function doDelMode(_, text) {
     if (text) {
         await delay(300) //same as above, need event signal for 'entered del mode'
         console.debug('parsing msgs to del')
-        let numMesToDel = Number(text).toFixed(0)
-        let lastMesID = $('.last_mes').attr('mesid')
+        let numMesToDel = Number(text);
+        let lastMesID = Number($('.last_mes').attr('mesid'));
         let oldestMesIDToDel = lastMesID - numMesToDel + 1;
 
         //disallow targeting first message
@@ -1417,26 +1295,6 @@ async function doDelMode(_, text) {
 
 function doResetPanels() {
     $("#movingUIreset").trigger('click');
-}
-
-function addLanguagesToDropdown() {
-    $.getJSON('i18n.json', function (data) {
-        if (!Array.isArray(data?.lang)) {
-            return;
-        }
-
-        for (const lang of data.lang) {
-            const option = document.createElement('option');
-            option.value = lang;
-            option.innerText = lang;
-            $('#ui_language_select').append(option);
-        }
-
-        const selectedLanguage = localStorage.getItem(storage_keys.ui_language);
-        if (selectedLanguage) {
-            $('#ui_language_select').val(selectedLanguage);
-        }
-    });
 }
 
 function setAvgBG() {
@@ -1490,10 +1348,6 @@ function setAvgBG() {
             $("#user-mes-blur-tint-color-picker").attr('color', 'rgb(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ')');
         } */
 
-
-
-
-
     function getAverageRGB(imgEl) {
 
         var blockSize = 5, // only visit every 5 pixels
@@ -1538,6 +1392,13 @@ function setAvgBG() {
 
     }
 
+    /**
+     * Converts an HSL color value to RGB.
+     * @param {number} h Hue value
+     * @param {number} s Saturation value
+     * @param {number} l Luminance value
+     * @return {Array} The RGB representation
+     */
     function hslToRgb(h, s, l) {
         const hueToRgb = (p, q, t) => {
             if (t < 0) t += 1;
@@ -1579,7 +1440,7 @@ function setAvgBG() {
 
         console.log(`rLum ${rLuminance}, gLum ${gLuminance}, bLum ${bLuminance}`)
 
-        return 0.2126 * rLuminance + 0.7152 * gLuminance + 0.0722 * bLuminance;
+        return 0.2126 * Number(rLuminance) + 0.7152 * Number(gLuminance) + 0.0722 * Number(bLuminance);
     }
 
     //this version keeps BG and main text in same hue
@@ -1714,7 +1575,24 @@ $(document).ready(() => {
     });
 
     $("#pin-examples-checkbox").change(function () {
+        if ($(this).prop("checked")) {
+            $("#remove-examples-checkbox").prop("checked", false).prop("disabled", true);
+            power_user.strip_examples = false;
+        } else {
+            $("#remove-examples-checkbox").prop("disabled", false);
+        }
         power_user.pin_examples = !!$(this).prop("checked");
+        saveSettingsDebounced();
+    });
+
+    $("#remove-examples-checkbox").change(function () {
+        if ($(this).prop("checked")) {
+            $("#pin-examples-checkbox").prop("checked", false).prop("disabled", true);
+            power_user.pin_examples = false;
+        } else {
+            $("#pin-examples-checkbox").prop("disabled", false);
+        }
+        power_user.strip_examples = !!$(this).prop("checked");
         saveSettingsDebounced();
     });
 
@@ -1745,13 +1623,13 @@ $(document).ready(() => {
     });
 
     $("#markdown_escape_strings").on('input', function () {
-        power_user.markdown_escape_strings = $(this).val();
+        power_user.markdown_escape_strings = String($(this).val());
         saveSettingsDebounced();
         reloadMarkdownProcessor(power_user.render_formulas);
     });
 
     $("#start_reply_with").on('input', function () {
-        power_user.user_prompt_bias = $(this).val();
+        power_user.user_prompt_bias = String($(this).val());
         saveSettingsDebounced();
     });
 
@@ -1878,7 +1756,7 @@ $(document).ready(() => {
     });
 
     $("#themes").on('change', function () {
-        const themeSelected = $(this).find(':selected').val();
+        const themeSelected = String($(this).find(':selected').val());
         power_user.theme = themeSelected;
         applyTheme(themeSelected);
         saveSettingsDebounced();
@@ -1886,7 +1764,7 @@ $(document).ready(() => {
 
     $("#movingUIPresets").on('change', async function () {
         console.log('saw MUI preset change')
-        const movingUIPresetSelected = $(this).find(':selected').val();
+        const movingUIPresetSelected = String($(this).find(':selected').val());
         power_user.movingUIPreset = movingUIPresetSelected;
         applyMovingUIPreset(movingUIPresetSelected);
         saveSettingsDebounced();
@@ -1900,6 +1778,7 @@ $(document).ready(() => {
         power_user.never_resize_avatars = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
+
     $("#show_card_avatar_urls").on('input', function () {
         power_user.show_card_avatar_urls = !!$(this).prop('checked');
         printCharacters();
@@ -1925,8 +1804,7 @@ $(document).ready(() => {
         power_user.sort_field = $(this).find(":selected").data('field');
         power_user.sort_order = $(this).find(":selected").data('order');
         power_user.sort_rule = $(this).find(":selected").data('rule');
-        sortCharactersList();
-        favsToHotswap();
+        printCharacters();
         saveSettingsDebounced();
     });
 
@@ -1946,7 +1824,7 @@ $(document).ready(() => {
     });
 
     $('#auto_swipe_blacklist').on('input', function () {
-        power_user.auto_swipe_blacklist = $(this).val()
+        power_user.auto_swipe_blacklist = String($(this).val())
             .split(",")
             .map(str => str.trim())
             .filter(str => str);
@@ -1955,7 +1833,7 @@ $(document).ready(() => {
     });
 
     $('#auto_swipe_minimum_length').on('input', function () {
-        const number = parseInt($(this).val());
+        const number = Number($(this).val());
         if (!isNaN(number)) {
             power_user.auto_swipe_minimum_length = number;
             saveSettingsDebounced();
@@ -1963,7 +1841,7 @@ $(document).ready(() => {
     });
 
     $('#auto_swipe_blacklist_threshold').on('input', function () {
-        const number = parseInt($(this).val());
+        const number = Number($(this).val());
         if (!isNaN(number)) {
             power_user.auto_swipe_blacklist_threshold = number;
             saveSettingsDebounced();
@@ -2038,12 +1916,6 @@ $(document).ready(() => {
         saveSettingsDebounced();
     });
 
-    /*     $("#removeXML").on("input", function () {
-            power_user.removeXML = !!$(this).prop('checked');
-            reloadCurrentChat();
-            saveSettingsDebounced();
-        }); */
-
     $("#token_padding").on("input", function () {
         power_user.token_padding = Number($(this).val());
         saveSettingsDebounced();
@@ -2052,35 +1924,35 @@ $(document).ready(() => {
     $("#messageTimerEnabled").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.timer_enabled = value;
-        localStorage.setItem(storage_keys.timer_enabled, power_user.timer_enabled);
+        localStorage.setItem(storage_keys.timer_enabled, String(power_user.timer_enabled));
         switchTimer();
     });
 
     $("#messageTimestampsEnabled").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.timestamps_enabled = value;
-        localStorage.setItem(storage_keys.timestamps_enabled, power_user.timestamps_enabled);
+        localStorage.setItem(storage_keys.timestamps_enabled, String(power_user.timestamps_enabled));
         switchTimestamps();
     });
 
     $("#messageModelIconEnabled").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.timestamp_model_icon = value;
-        localStorage.setItem(storage_keys.timestamp_model_icon, power_user.timestamp_model_icon);
+        localStorage.setItem(storage_keys.timestamp_model_icon, String(power_user.timestamp_model_icon));
         switchIcons();
     });
 
     $("#mesIDDisplayEnabled").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.mesIDDisplay_enabled = value;
-        localStorage.setItem(storage_keys.mesIDDisplay_enabled, power_user.mesIDDisplay_enabled);
+        localStorage.setItem(storage_keys.mesIDDisplay_enabled, String(power_user.mesIDDisplay_enabled));
         switchMesIDDisplay();
     });
 
     $("#hotswapEnabled").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.hotswap_enabled = value;
-        localStorage.setItem(storage_keys.hotswap_enabled, power_user.hotswap_enabled);
+        localStorage.setItem(storage_keys.hotswap_enabled, String(power_user.hotswap_enabled));
         switchHotswap();
     });
 
@@ -2096,9 +1968,10 @@ $(document).ready(() => {
         saveSettingsDebounced();
     });
 
-    $("#continue_on_send").on("input", function () {
+    $("#quick_continue").on("input", function () {
         const value = !!$(this).prop('checked');
-        power_user.continue_on_send = value;
+        power_user.quick_continue = value;
+        $("#mes_continue").css('display', value ? '' : 'none');
         saveSettingsDebounced();
     });
 
@@ -2126,7 +1999,7 @@ $(document).ready(() => {
     });
 
     $('#custom_stopping_strings').on('input', function () {
-        power_user.custom_stopping_strings = $(this).val();
+        power_user.custom_stopping_strings = String($(this).val());
         saveSettingsDebounced();
     });
 
@@ -2156,18 +2029,6 @@ $(document).ready(() => {
         saveSettingsDebounced();
     });
 
-    $('#ui_language_select').on('change', async function () {
-        const language = $(this).val();
-
-        if (language) {
-            localStorage.setItem(storage_keys.ui_language, language);
-        } else {
-            localStorage.removeItem(storage_keys.ui_language);
-        }
-
-        location.reload();
-    });
-
     $(window).on('focus', function () {
         browser_has_focus = true;
     });
@@ -2183,5 +2044,4 @@ $(document).ready(() => {
     registerSlashCommand('cut', doMesCut, [], ' <span class="monospace">(requred number)</span> – cuts the specified message from the chat', true, true);
     registerSlashCommand('resetpanels', doResetPanels, ['resetui'], ' – resets UI panels to original state.', true, true);
     registerSlashCommand('bgcol', setAvgBG, [], ' – WIP test of auto-bg avg coloring', true, true);
-    addLanguagesToDropdown();
 });
