@@ -135,6 +135,7 @@ const languageCodes = {
     'Zulu': 'zu',
 };
 
+<<<<<<< HEAD
 const KEY_REQUIRED = ['deepl','libre'];
 const LOCAL_URL = ['libre'];
 
@@ -144,6 +145,14 @@ function showKeysButton() {
     $("#translate_key_button").toggle(providerRequiresKey);
     $("#translate_key_button").toggleClass('success', Boolean(secret_state[extension_settings.translate.provider]));
     $("#translate_url_button").toggle(providerOptionalUrl);
+=======
+const KEY_REQUIRED = ['deepl'];
+
+function showKeyButton() {
+    const providerRequiresKey = KEY_REQUIRED.includes(extension_settings.translate.provider);
+    $("#translate_key_button").toggle(providerRequiresKey);
+    $("#translate_key_button").toggleClass('success', Boolean(secret_state[extension_settings.translate.provider]));
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 function loadSettings() {
@@ -156,7 +165,11 @@ function loadSettings() {
     $(`#translation_provider option[value="${extension_settings.translate.provider}"]`).attr('selected', true);
     $(`#translation_target_language option[value="${extension_settings.translate.target_language}"]`).attr('selected', true);
     $(`#translation_auto_mode option[value="${extension_settings.translate.auto_mode}"]`).attr('selected', true);
+<<<<<<< HEAD
     showKeysButton();
+=======
+    showKeyButton();
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 async function translateImpersonate(text) {
@@ -184,6 +197,7 @@ async function translateIncomingMessage(messageId) {
     updateMessageBlock(messageId, message);
 }
 
+<<<<<<< HEAD
 async function translateProviderLibre(text, lang) {
     const response = await fetch('/libre_translate', {
         method: 'POST',
@@ -200,6 +214,8 @@ async function translateProviderLibre(text, lang) {
 }
 
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 async function translateProviderGoogle(text, lang) {
     const response = await fetch('/google_translate', {
         method: 'POST',
@@ -241,8 +257,11 @@ async function translate(text, lang) {
         }
 
         switch (extension_settings.translate.provider) {
+<<<<<<< HEAD
             case 'libre':
                 return await translateProviderLibre(text, lang);
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             case 'google':
                 return await translateProviderGoogle(text, lang);
             case 'deepl':
@@ -389,12 +408,18 @@ jQuery(() => {
                 <label for="translation_provider">Provider</label>
                 <div class="flex-container gap5px flexnowrap marginBot5">
                     <select id="translation_provider" name="provider" class="margin0">
+<<<<<<< HEAD
                         <option value="libre">Libre</option>
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                         <option value="google">Google</option>
                         <option value="deepl">DeepL</option>
                     <select>
                     <div id="translate_key_button" class="menu_button fa-solid fa-key margin0"></div>
+<<<<<<< HEAD
                     <div id="translate_url_button" class="menu_button fa-solid fa-link margin0"></div>
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 </div>
                 <label for="translation_target_language">Target Language</label>
                 <select id="translation_target_language" name="target_language"></select>
@@ -426,7 +451,11 @@ jQuery(() => {
     });
     $('#translation_provider').on('change', (event) => {
         extension_settings.translate.provider = event.target.value;
+<<<<<<< HEAD
         showKeysButton();
+=======
+        showKeyButton();
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         saveSettingsDebounced();
     });
     $('#translation_target_language').on('change', (event) => {
@@ -445,6 +474,7 @@ jQuery(() => {
         await writeSecret(extension_settings.translate.provider, key);
         toastr.success('API Key saved');
     });
+<<<<<<< HEAD
     $('#translate_url_button').on('click', async () => {
         const optionText = $('#translation_provider option:selected').text();
         const url = await callPopup(`<h3>${optionText} API URL</h3>`, 'input');
@@ -456,6 +486,8 @@ jQuery(() => {
         await writeSecret(extension_settings.translate.provider + "_url", url);
         toastr.success('API URL saved');
     });
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
     loadSettings();
 

@@ -3,6 +3,7 @@ import { waitUntilCondition } from "./utils.js";
 const storageKey = "language";
 export const localeData = await fetch("i18n.json").then(response => response.json());
 
+<<<<<<< HEAD
 function getMissingTranslations() {
     const missingData = [];
 
@@ -52,6 +53,8 @@ function getMissingTranslations() {
 
 window["getMissingTranslations"] = getMissingTranslations;
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 export function applyLocale(root = document) {
     const overrideLanguage = localStorage.getItem("language");
     var language = overrideLanguage || navigator.language || navigator.userLanguage;

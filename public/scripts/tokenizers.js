@@ -1,14 +1,23 @@
+<<<<<<< HEAD
 import { characters, main_api, nai_settings, online_status, this_chid } from "../script.js";
+=======
+import { characters, main_api, nai_settings, this_chid } from "../script.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import { power_user } from "./power-user.js";
 import { encode } from "../lib/gpt-2-3-tokenizer/mod.js";
 import { GPT3BrowserTokenizer } from "../lib/gpt-3-tokenizer/gpt3-tokenizer.js";
 import { chat_completion_sources, oai_settings } from "./openai.js";
 import { groups, selected_group } from "./group-chats.js";
 import { getStringHash } from "./utils.js";
+<<<<<<< HEAD
 import { kai_settings } from "./kai-settings.js";
 
 export const CHARACTERS_PER_TOKEN_RATIO = 3.35;
 const TOKENIZER_WARNING_KEY = 'tokenizationWarningShown';
+=======
+
+export const CHARACTERS_PER_TOKEN_RATIO = 3.35;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
 export const tokenizers = {
     NONE: 0,
@@ -26,6 +35,7 @@ const gpt3 = new GPT3BrowserTokenizer({ type: 'gpt3' });
 
 let tokenCache = {};
 
+<<<<<<< HEAD
 /**
  * Guesstimates the token count for a string.
  * @param {string} str String to tokenize.
@@ -35,6 +45,8 @@ export function guesstimate(str) {
     return Math.ceil(str.length / CHARACTERS_PER_TOKEN_RATIO);
 }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 async function loadTokenCache() {
     try {
         console.debug('Chat Completions: loading token cache')
@@ -79,6 +91,7 @@ function getTokenizerBestMatch() {
         }
     }
     if (main_api === 'kobold' || main_api === 'textgenerationwebui' || main_api === 'koboldhorde') {
+<<<<<<< HEAD
         // Try to use the API tokenizer if possible:
         // - API must be connected
         // - Kobold must pass a version check
@@ -87,6 +100,8 @@ function getTokenizerBestMatch() {
             return tokenizers.API;
         }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         return tokenizers.LLAMA;
     }
 
@@ -108,7 +123,11 @@ export function getTokenCount(str, padding = undefined) {
     function calculate(type) {
         switch (type) {
             case tokenizers.NONE:
+<<<<<<< HEAD
                 return guesstimate(str) + padding;
+=======
+                return Math.ceil(str.length / CHARACTERS_PER_TOKEN_RATIO) + padding;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             case tokenizers.GPT3:
                 return gpt3.encode(str).bpe.length + padding;
             case tokenizers.CLASSIC:
@@ -310,6 +329,7 @@ function getTokenCacheObject() {
     return tokenCache[String(chatId)];
 }
 
+<<<<<<< HEAD
 /**
  * Counts token using the remote server API.
  * @param {string} endpoint API endpoint.
@@ -320,6 +340,10 @@ function getTokenCacheObject() {
 function countTokensRemote(endpoint, str, padding) {
     let tokenCount = 0;
 
+=======
+function countTokensRemote(endpoint, str, padding) {
+    let tokenCount = 0;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     jQuery.ajax({
         async: false,
         type: 'POST',
@@ -328,6 +352,7 @@ function countTokensRemote(endpoint, str, padding) {
         dataType: "json",
         contentType: "application/json",
         success: function (data) {
+<<<<<<< HEAD
             if (typeof data.count === 'number') {
                 tokenCount = data.count;
             } else {
@@ -347,6 +372,11 @@ function countTokensRemote(endpoint, str, padding) {
         }
     });
 
+=======
+            tokenCount = data.count;
+        }
+    });
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     return tokenCount + padding;
 }
 

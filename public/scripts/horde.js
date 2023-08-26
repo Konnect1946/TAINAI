@@ -7,7 +7,12 @@ import {
 } from "../script.js";
 import { SECRET_KEYS, writeSecret } from "./secrets.js";
 import { delay } from "./utils.js";
+<<<<<<< HEAD
 import { getDeviceInfo } from "./RossAscends-mods.js";
+=======
+import { deviceInfo } from "./RossAscends-mods.js";
+import { power_user } from "./power-user.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import { autoSelectInstructPreset } from "./instruct-mode.js";
 
 export {
@@ -258,8 +263,12 @@ jQuery(function () {
     $("#horde_kudos").on("click", showKudos);
 
     // Not needed on mobile
+<<<<<<< HEAD
     const deviceInfo = getDeviceInfo();
     if (deviceInfo && deviceInfo.device.type === 'desktop') {
+=======
+    if (deviceInfo.device.type === 'desktop') {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         $('#horde_model').select2({
             width: '100%',
             placeholder: 'Select Horde models',

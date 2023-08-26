@@ -4,7 +4,11 @@
         "ja-jp",
         "ko-kr",
         "ru-ru",
+<<<<<<< HEAD
 	"it-it",
+=======
+	    "it-it",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     "nl-nl"
     ],
     "zh-cn": {
@@ -140,6 +144,7 @@
         "Wrap Sequences with Newline": "用换行符换行序列",
         "Include Names": "包括名称",
         "System Prompt": "系统提示",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "指令模式序列",
         "Input Sequence": "输入序列",
         "Output Sequence": "输出序列",
@@ -147,6 +152,11 @@
         "Last Output Sequence": "最后输出序列",
         "System Sequence Prefix": "系统序列前缀",
         "System Sequence Suffix": "系统序列后缀",
+=======
+        "Input Sequence": "输入序列",
+        "Output Sequence": "输出序列",
+        "System Sequence": "系统顺序",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "停止序列",
         "Context Formatting": "上下文格式",
         "Tokenizer": "分词器",
@@ -697,12 +707,18 @@
         "Wrap Sequences with Newline": "シーケンスを改行でラップする",
         "Include Names": "名前を含める",
         "System Prompt": "システムプロンプト",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "命令モードシーケンス",
         "Input Sequence": "入力シーケンス",
         "First Output Sequence": "最初の出力シーケンス",
         "Last Output Sequence": "最後の出力シーケンス",
         "System Sequence Prefix": "システムシーケンスプレフィックス",
         "System Sequence Suffix": "システムシーケンスサフィックス",
+=======
+        "Input Sequence": "入力シーケンス",
+        "Output Sequence": "出力シーケンス",
+        "System Sequence": "システムシーケンス",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "停止シーケンス",
         "Context Formatting": "コンテキストフォーマッティング",
         "Tokenizer": "トークナイザー",
@@ -1255,12 +1271,18 @@
         "Wrap Sequences with Newline": "배열 명령 양 끝에 줄바꿈 삽입",
         "Include Names": "이름 포함",
         "System Prompt": "시스템 프롬프트",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "지시 모드 순서",
         "Input Sequence": "입력 배열",
         "First Output Sequence": "첫 번째 출력 시퀀스",
         "Last Output Sequence": "마지막 출력 순서",
         "System Sequence Prefix": "시스템 시퀀스 접두사",
         "System Sequence Suffix": "시스템 시퀀스 접미사",
+=======
+        "Input Sequence": "입력 배열",
+        "Output Sequence": "출력 배열",
+        "System Sequence": "시스템 배열",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "정지 배열",
         "Context Formatting": "맥락 서식",
         "Tokenizer": "토큰화 장치",
@@ -1817,12 +1839,18 @@
         "Wrap Sequences with Newline": "Отделять последовательности красной строкой",
         "Include Names": "Показывать имена",
         "System Prompt": "Системная инструкция",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "Последовательности режима обучения",
         "Input Sequence": "Input Sequence",
         "First Output Sequence": "Первая выходная последовательность",
         "Last Output Sequence": "Последняя выходная последовательность",
         "System Sequence Prefix": "Префикс системной последовательности",
         "System Sequence Suffix": "Суффикс системной последовательности",
+=======
+        "Input Sequence": "Input Sequence",
+        "Output Sequence": "Output Sequence",
+        "System Sequence": "System Sequence",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "Stop Sequence",
         "Context Formatting": "Форматирование контекста",
         "Tokenizer": "Токенайзер",
@@ -2376,12 +2404,18 @@
         "Wrap Sequences with Newline": "Ogni sequenza viene rimandata a capo",
         "Include Names": "Includi i nomi",
         "System Prompt": "Prompt di sistema",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "Sequenze in modalità istruzione",
         "Input Sequence": "Sequenza di input",
         "First Output Sequence": "Prima sequenza di output",
         "Last Output Sequence": "Ultima sequenza di output",
         "System Sequence Prefix": "Prefisso sequenza di sistema",
         "System Sequence Suffix": "Suffisso della sequenza del sistema",
+=======
+        "Input Sequence": "Sequenza di input",
+        "Output Sequence": "Sequenza di output",
+        "System Sequence": "Sequenza di sistema",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "Sequenza d'arresto",
         "Context Formatting": "Formattazione del contesto",
         "Tokenizer": "Tokenizer",
@@ -2798,6 +2832,7 @@
         "Bind user name to that avatar": "Lega il nome utente a questo avatar",
         "Select this as default persona for the new chats.": "Seleziona questo alterego come predefinito per tutte le nuove chat",
         "Change persona image": "Cambia l'immagine del tuo alterego",
+<<<<<<< HEAD
         "Delete persona": "Elimina il tuo alterego",
 	"--- Pick to Edit ---": "--- Scegli per modificare ---",
 	"Add text here that would make the AI generate things you don't want in your outputs.": "Scrivi qui ciò che non vuoi l'IA generi nel suo output.",
@@ -2926,6 +2961,9 @@
 	"Will be used as a password for the proxy instead of API key.": "Verrà usato come password per il proxy invece che la chiave API.",
 	"Window AI Model": "Modello Window AI",
 	"Your Persona": "Il tuo alterego"
+=======
+        "Delete persona": "Elimina il tuo alterego"
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     },
     "nl-nl": {
         "clickslidertips": "klikregel tips",
@@ -3060,12 +3098,18 @@
         "Wrap Sequences with Newline": "Wikkel sequenties in met een nieuwe regel",
         "Include Names": "Inclusief namen",
         "System Prompt": "Systeemprompt",
+<<<<<<< HEAD
         "Instruct Mode Sequences": "Instrueermodusreeksen",
         "Input Sequence": "Invoersequentie",
         "First Output Sequence": "Eerste uitvoerreeks",
         "Last Output Sequence": "Laatste uitvoerreeks",
         "System Sequence Prefix": "Systeemreeksvoorvoegsel",
         "System Sequence Suffix": "Systeemreeksachtervoegsel",
+=======
+        "Input Sequence": "Invoersequentie",
+        "Output Sequence": "Uitvoersequentie",
+        "System Sequence": "Systeemsequentie",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "Stop Sequence": "Stopsequentie",
         "Context Formatting": "Contextopmaak",
         "Tokenizer": "Tokenizer",

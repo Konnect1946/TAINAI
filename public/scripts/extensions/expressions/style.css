@@ -6,13 +6,21 @@
 
 #expression-wrapper {
     display: flex;
+<<<<<<< HEAD
     height: calc(100vh - var(--topBarBlockSize));
+=======
+    height: calc(100vh - 40px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     width: 100vw;
 }
 
 #visual-novel-wrapper {
     display: flex;
+<<<<<<< HEAD
     height: calc(100vh - var(--topBarBlockSize));
+=======
+    height: calc(100vh - 40px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     width: 100vw;
     position: relative;
     overflow: hidden;
@@ -180,4 +188,8 @@ img.expression.default {
     div.expression {
         display: none;
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0

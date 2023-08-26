@@ -57,6 +57,10 @@ export function getCfgPrompt(guidanceScale, isNegative) {
             substituteParams(
                 chat_metadata[isNegative ? metadataKeys.negative_prompt : metadataKeys.positive_prompt]
             )
+<<<<<<< HEAD
+=======
+            ?.trim()
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         );
     }
 
@@ -66,6 +70,10 @@ export function getCfgPrompt(guidanceScale, isNegative) {
             substituteParams(
                 isNegative ? charaCfg.negative_prompt : charaCfg.positive_prompt
             )
+<<<<<<< HEAD
+=======
+            ?.trim()
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         );
     }
 
@@ -74,6 +82,10 @@ export function getCfgPrompt(guidanceScale, isNegative) {
             substituteParams(
                 isNegative ? extension_settings.cfg.global.negative_prompt : extension_settings.cfg.global.positive_prompt
             )
+<<<<<<< HEAD
+=======
+            ?.trim()
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         );
     }
 

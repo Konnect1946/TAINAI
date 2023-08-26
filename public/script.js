@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { humanizedDateTime, favsToHotswap, getMessageTimeStamp, dragElement, isMobile, initRossMods, } from "./scripts/RossAscends-mods.js";
+=======
+import { humanizedDateTime, favsToHotswap, getMessageTimeStamp, dragElement, isMobile, } from "./scripts/RossAscends-mods.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import { userStatsHandler, statMesProcess } from './scripts/stats.js';
 import {
     generateKoboldWithStreaming,
@@ -8,7 +12,10 @@ import {
     getKoboldGenerationData,
     canUseKoboldStopSequence,
     canUseKoboldStreaming,
+<<<<<<< HEAD
     canUseKoboldTokenization,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 } from "./scripts/kai-settings.js";
 
 import {
@@ -131,12 +138,19 @@ import {
     isDigitsOnly,
     PAGINATION_TEMPLATE,
     waitUntilCondition,
+<<<<<<< HEAD
     escapeRegex,
     resetScrollHeight,
 } from "./scripts/utils.js";
 
 import { extension_settings, getContext, loadExtensionSettings, processExtensionHelpers, registerExtensionHelper, runGenerationInterceptors, saveMetadataDebounced } from "./scripts/extensions.js";
 import { COMMENT_NAME_DEFAULT, executeSlashCommands, getSlashCommandsHelp, registerSlashCommand } from "./scripts/slash-commands.js";
+=======
+} from "./scripts/utils.js";
+
+import { extension_settings, getContext, loadExtensionSettings, processExtensionHelpers, registerExtensionHelper, runGenerationInterceptors, saveMetadataDebounced } from "./scripts/extensions.js";
+import { executeSlashCommands, getSlashCommandsHelp, registerSlashCommand } from "./scripts/slash-commands.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import {
     tag_map,
     tags,
@@ -157,14 +171,22 @@ import {
 } from "./scripts/secrets.js";
 import { EventEmitter } from './lib/eventemitter.js';
 import { markdownExclusionExt } from "./scripts/showdown-exclusion.js";
+<<<<<<< HEAD
 import { NOTE_MODULE_NAME, initAuthorsNote, metadata_keys, setFloatingPrompt, shouldWIAddPrompt } from "./scripts/authors-note.js";
 import { getDeviceInfo } from "./scripts/RossAscends-mods.js";
+=======
+import { NOTE_MODULE_NAME, metadata_keys, setFloatingPrompt, shouldWIAddPrompt } from "./scripts/authors-note.js";
+import { deviceInfo } from "./scripts/RossAscends-mods.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import { registerPromptManagerMigration } from "./scripts/PromptManager.js";
 import { getRegexedString, regex_placement } from "./scripts/extensions/regex/engine.js";
 import { FILTER_TYPES, FilterHelper } from "./scripts/filters.js";
 import { getCfgPrompt, getGuidanceScale } from "./scripts/extensions/cfg/util.js";
 import {
+<<<<<<< HEAD
     force_output_sequence,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     formatInstructModeChat,
     formatInstructModePrompt,
     formatInstructModeExamples,
@@ -375,9 +397,12 @@ const system_message_types = {
 };
 
 const extension_prompt_types = {
+<<<<<<< HEAD
     /**
      * @deprecated Outdated term. In reality it's "after main prompt or story string"
      */
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     AFTER_SCENARIO: 0,
     IN_CHAT: 1
 };
@@ -501,6 +526,7 @@ function getUrlSync(url, cache = true) {
     }).responseText;
 }
 
+<<<<<<< HEAD
 const templateCache = {};
 
 export function renderTemplate(templateId, templateData = {}, sanitize = true, localize = true, fullPath = false) {
@@ -508,6 +534,11 @@ export function renderTemplate(templateId, templateData = {}, sanitize = true, l
         const pathToTemplate = fullPath ? templateId : `/scripts/templates/${templateId}.html`;
         const templateContent = (pathToTemplate in templateCache) ? templateCache[pathToTemplate] : getUrlSync(pathToTemplate);
         templateCache[pathToTemplate] = templateContent;
+=======
+function renderTemplate(templateId, templateData = {}, sanitize = true, localize = true) {
+    try {
+        const templateContent = getUrlSync(`/scripts/templates/${templateId}.html`);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         const template = Handlebars.compile(templateContent);
         let result = template(templateData);
 
@@ -794,7 +825,10 @@ async function getStatus() {
                 if (main_api === "kobold" || main_api === "koboldhorde") {
                     kai_settings.use_stop_sequence = canUseKoboldStopSequence(data.version);
                     kai_settings.can_use_streaming = canUseKoboldStreaming(data.koboldVersion);
+<<<<<<< HEAD
                     kai_settings.can_use_tokenization = canUseKoboldTokenization(data.koboldVersion);
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 }
 
                 // We didn't get a 200 status code, but the endpoint has an explanation. Which means it DID connect, but I digress.
@@ -907,6 +941,7 @@ function getCharacterBlock(item, id) {
 }
 
 async function printCharacters(fullRefresh = false) {
+<<<<<<< HEAD
     if (fullRefresh) {
         saveCharactersPage = 0;
         printTagFilters(tag_filter_types.character);
@@ -916,6 +951,8 @@ async function printCharacters(fullRefresh = false) {
         displayOverrideWarnings();
     }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const storageKey = 'Characters_PerPage';
     $("#rm_print_characters_pagination").pagination({
         dataSource: getEntitiesList({ doFilter: true }),
@@ -947,12 +984,27 @@ async function printCharacters(fullRefresh = false) {
         afterPaging: function (e) {
             saveCharactersPage = e;
         },
+<<<<<<< HEAD
         afterRender: function () {
             $('#rm_print_characters_block').scrollTop(0);
         },
     });
 
     favsToHotswap();
+=======
+    });
+
+    favsToHotswap();
+    saveCharactersPage = 0;
+
+    if (fullRefresh) {
+        printTagFilters(tag_filter_types.character);
+        printTagFilters(tag_filter_types.group_member);
+
+        await delay(300);
+        displayOverrideWarnings();
+    }
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 export function getEntitiesList({ doFilter } = {}) {
@@ -1202,11 +1254,14 @@ function messageFormatting(mes, ch_name, isSystem, isUser) {
         mes = '';
     }
 
+<<<<<<< HEAD
     // Force isSystem = false on comment messages so they get formatted properly
     if (ch_name === COMMENT_NAME_DEFAULT && isSystem && !isUser) {
         isSystem = false;
     }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     // Prompt bias replacement should be applied on the raw message
     if (!power_user.show_user_prompt_bias && ch_name && !isUser && !isSystem) {
         mes = mes.replaceAll(substituteParams(power_user.user_prompt_bias), "");
@@ -1649,6 +1704,7 @@ function scrollChatToBottom() {
     }
 }
 
+<<<<<<< HEAD
 /**
  * Substitutes {{macro}} parameters in a string.
  * @param {string} content - The string to substitute parameters in.
@@ -1658,6 +1714,8 @@ function scrollChatToBottom() {
  * @param {*} _group - The group members list for {{group}} substitution.
  * @returns {string} The string with substituted parameters.
  */
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 function substituteParams(content, _name1, _name2, _original, _group) {
     _name1 = _name1 ?? name1;
     _name2 = _name2 ?? name2;
@@ -1910,10 +1968,16 @@ function cleanGroupMessage(getMessage) {
                 continue;
             }
 
+<<<<<<< HEAD
             const regex = new RegExp(`(^|\n)${escapeRegex(name)}:`);
             const nameMatch = getMessage.match(regex);
             if (nameMatch) {
                 getMessage = getMessage.substring(nameMatch.index + nameMatch[0].length);
+=======
+            const indexOfMember = getMessage.indexOf(`${name}:`);
+            if (indexOfMember != -1) {
+                getMessage = getMessage.substr(0, indexOfMember);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             }
         }
     }
@@ -2079,7 +2143,11 @@ class StreamingProcessor {
             chat[messageId]['gen_started'] = this.timeStarted;
             chat[messageId]['gen_finished'] = currentTime;
 
+<<<<<<< HEAD
             if ((this.type == 'swipe' || this.type === 'continue') && Array.isArray(chat[messageId]['swipes'])) {
+=======
+            if (this.type == 'swipe' && Array.isArray(chat[messageId]['swipes'])) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 chat[messageId]['swipes'][chat[messageId]['swipe_id']] = processedText;
                 chat[messageId]['swipe_info'][chat[messageId]['swipe_id']] = { 'send_date': chat[messageId]['send_date'], 'gen_started': chat[messageId]['gen_started'], 'gen_finished': chat[messageId]['gen_finished'], 'extra': JSON.parse(JSON.stringify(chat[messageId]['extra'])) };
             }
@@ -2282,8 +2350,13 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
         return;
     }
 
+<<<<<<< HEAD
     // Hide swipes if not in a dry run.
     if (!dryRun) {
+=======
+    // Hide swipes on either multigen or real streaming
+    if ((isStreamingEnabled() || isMultigenEnabled()) && !dryRun) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         hideSwipeButtons();
     }
 
@@ -2350,10 +2423,13 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
             }
         }
 
+<<<<<<< HEAD
         if (!type && !textareaText && power_user.continue_on_send && !selected_group && chat.length && !chat[chat.length - 1]['is_user'] && !chat[chat.length - 1]['is_system']) {
             type = 'continue';
         }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         const isContinue = type == 'continue';
 
         if (!dryRun) {
@@ -2459,6 +2535,7 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
             chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, false);
 
+<<<<<<< HEAD
             if (j === 0 && isInstruct) {
                 // Reformat with the first output sequence (if any)
                 chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, force_output_sequence.FIRST);
@@ -2469,6 +2546,13 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 if (isInstruct) {
                     // Reformat with the last output sequence (if any)
                     chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, force_output_sequence.LAST);
+=======
+            // Do not suffix the message for continuation
+            if (i === 0 && isContinue) {
+                if (isInstruct) {
+                    // Reformat with the last output line (if any)
+                    chat2[i] = formatMessageHistoryItem(coreChat[j], isInstruct, true);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 }
 
                 chat2[i] = chat2[i].slice(0, chat2[i].lastIndexOf(coreChat[j].mes) + coreChat[j].mes.length);
@@ -2633,7 +2717,11 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 console.debug('generating prompt');
                 chatString = "";
                 arrMes = arrMes.reverse();
+<<<<<<< HEAD
                 arrMes.forEach(function (item, i, arr) {// For added anchors and others
+=======
+                arrMes.forEach(function (item, i, arr) {//For added anchors and others
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                     // OAI doesn't need all of this
                     if (main_api === 'openai') {
                         return;
@@ -2649,7 +2737,29 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                         }
                     }
 
+<<<<<<< HEAD
                     mesSend[mesSend.length] = { message: item, extensionPrompts: [] };
+=======
+                    if (i === 0) {
+                        // Process those that couldn't get that far
+                        for (let upperDepth = 100; upperDepth >= arrMes.length; upperDepth--) {
+                            const upperAnchor = getExtensionPrompt(extension_prompt_types.IN_CHAT, upperDepth);
+                            if (upperAnchor && upperAnchor.length) {
+                                item = upperAnchor + item;
+                            }
+                        }
+                    }
+
+                    const anchorDepth = Math.abs(i - arrMes.length + 1);
+                    // NOTE: Depth injected here!
+                    const extensionAnchor = getExtensionPrompt(extension_prompt_types.IN_CHAT, anchorDepth);
+
+                    if (anchorDepth > 0 && extensionAnchor && extensionAnchor.length) {
+                        item += extensionAnchor;
+                    }
+
+                    mesSend[mesSend.length] = item;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 });
             }
 
@@ -2662,10 +2772,14 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
                 console.debug('--setting Prompt string');
                 mesExmString = pinExmString ?? mesExamplesArray.slice(0, count_exm_add).join('');
+<<<<<<< HEAD
 
                 if (mesSend.length) {
                     mesSend[mesSend.length - 1].message = modifyLastPromptLine(mesSend[mesSend.length - 1].message);
                 }
+=======
+                mesSend[mesSend.length - 1] = modifyLastPromptLine(mesSend[mesSend.length - 1]);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             }
 
             function modifyLastPromptLine(lastMesString) {
@@ -2763,10 +2877,13 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
             // Fetches the combined prompt for both negative and positive prompts
             const cfgGuidanceScale = getGuidanceScale();
+<<<<<<< HEAD
 
             // For prompt bit itemization
             let mesSendString = '';
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             function getCombinedPrompt(isNegative) {
                 // Only return if the guidance scale doesn't exist or the value is 1
                 // Also don't return if constructing the neutral prompt
@@ -2774,6 +2891,7 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                     return;
                 }
 
+<<<<<<< HEAD
                 // OAI has its own prompt manager. No need to do anything here
                 if (main_api === 'openai') {
                     return ''
@@ -2818,6 +2936,9 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                     }
                 }
 
+=======
+                let finalMesSend = [...mesSend];
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 let cfgPrompt = {};
                 if (cfgGuidanceScale && cfgGuidanceScale?.value !== 1) {
                     cfgPrompt = getCfgPrompt(cfgGuidanceScale, isNegative);
@@ -2825,13 +2946,22 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
                 if (cfgPrompt && cfgPrompt?.value) {
                     if (cfgPrompt?.depth === 0) {
+<<<<<<< HEAD
                         finalMesSend[finalMesSend.length - 1].message +=
                             /\s/.test(finalMesSend[finalMesSend.length - 1].message.slice(-1))
+=======
+                        finalMesSend[finalMesSend.length - 1] +=
+                            /\s/.test(finalMesSend[finalMesSend.length - 1].slice(-1))
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                                 ? cfgPrompt.value
                                 : ` ${cfgPrompt.value}`;
                     } else {
                         // TODO: Make all extension prompts use an array/splice method
+<<<<<<< HEAD
                         finalMesSend[mesSend.length - cfgPrompt.depth].extensionPrompts.push(`${cfgPrompt.value}\n`);
+=======
+                        finalMesSend.splice(mesSend.length - cfgPrompt.depth, 0, `${cfgPrompt.value}\n`);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                     }
                 }
 
@@ -2839,20 +2969,38 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 // Always run with continue
                 if (!isInstruct && !isImpersonate && (tokens_already_generated === 0 || isContinue)) {
                     if (promptBias.trim().length !== 0) {
+<<<<<<< HEAD
                         finalMesSend[finalMesSend.length - 1].message +=
                             /\s/.test(finalMesSend[finalMesSend.length - 1].message.slice(-1))
+=======
+                        finalMesSend[finalMesSend.length - 1] +=
+                            /\s/.test(finalMesSend[finalMesSend.length - 1].slice(-1))
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                                 ? promptBias.trimStart()
                                 : ` ${promptBias.trimStart()}`;
                     }
                 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 // Prune from prompt cache if it exists
                 if (generatedPromtCache.length !== 0) {
                     generatedPromtCache = cleanupPromptCache(generatedPromtCache);
                 }
 
+<<<<<<< HEAD
                 // Right now, everything is suffixed with a newline
                 mesSendString = finalMesSend.map((e) => `${e.extensionPrompts.join('')}${e.message}`).join('');
+=======
+                // Override for prompt bits data
+                if (!isNegative) {
+                    mesSend = finalMesSend;
+                }
+
+                let mesSendString = finalMesSend.join('');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
                 // add chat preamble
                 mesSendString = addChatsPreamble(mesSendString);
@@ -2867,6 +3015,16 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                     mesSendString +
                     generatedPromtCache;
 
+<<<<<<< HEAD
+=======
+                // TODO: Move zero-depth anchor append to work like CFG and bias appends
+                if (zeroDepthAnchor && zeroDepthAnchor.length) {
+                    if (!isMultigenEnabled() || tokens_already_generated == 0) {
+                        combinedPrompt = appendZeroDepthAnchor(force_name2, zeroDepthAnchor, combinedPrompt);
+                    }
+                }
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 combinedPrompt = combinedPrompt.replace(/\r/gm, '');
 
                 if (power_user.collapse_newlines) {
@@ -2878,7 +3036,11 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
             // Get the negative prompt first since it has the unmodified mesSend array
             let negativePrompt = main_api == 'textgenerationwebui' ? getCombinedPrompt(true) : undefined;
+<<<<<<< HEAD
             let finalPrompt = getCombinedPrompt(false);
+=======
+            let finalPromt = getCombinedPrompt(false);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
             // Include the entire guidance scale object
             const cfgValues = cfgGuidanceScale && cfgGuidanceScale?.value !== 1 ? ({ guidanceScale: cfgGuidanceScale, negativePrompt: negativePrompt }) : null;
@@ -2902,7 +3064,11 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
             let generate_data;
             if (main_api == 'koboldhorde' || main_api == 'kobold') {
                 generate_data = {
+<<<<<<< HEAD
                     prompt: finalPrompt,
+=======
+                    prompt: finalPromt,
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                     gui_settings: true,
                     max_length: amount_gen,
                     temperature: kai_settings.temp,
@@ -2912,16 +3078,28 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
 
                 if (preset_settings != 'gui') {
                     const maxContext = (adjustedParams && horde_settings.auto_adjust_context_length) ? adjustedParams.maxContextLength : max_context;
+<<<<<<< HEAD
                     generate_data = getKoboldGenerationData(finalPrompt, this_settings, this_amount_gen, maxContext, isImpersonate, type);
                 }
             }
             else if (main_api == 'textgenerationwebui') {
                 generate_data = getTextGenGenerationData(finalPrompt, this_amount_gen, isImpersonate, cfgValues);
+=======
+                    generate_data = getKoboldGenerationData(finalPromt, this_settings, this_amount_gen, maxContext, isImpersonate, type);
+                }
+            }
+            else if (main_api == 'textgenerationwebui') {
+                generate_data = getTextGenGenerationData(finalPromt, this_amount_gen, isImpersonate, cfgValues);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 generate_data.use_mancer = api_use_mancer_webui;
             }
             else if (main_api == 'novel') {
                 const this_settings = novelai_settings[novelai_setting_names[nai_settings.preset_settings_novel]];
+<<<<<<< HEAD
                 generate_data = getNovelGenerationData(finalPrompt, this_settings, this_amount_gen, isImpersonate, cfgValues);
+=======
+                generate_data = getNovelGenerationData(finalPromt, this_settings, this_amount_gen, isImpersonate, cfgValues);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             }
             else if (main_api == 'openai') {
                 let [prompt, counts] = prepareOpenAIMessages({
@@ -2977,10 +3155,17 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 storyString: storyString,
                 afterScenarioAnchor: afterScenarioAnchor,
                 examplesString: examplesString,
+<<<<<<< HEAD
                 mesSendString: mesSendString,
                 generatedPromtCache: generatedPromtCache,
                 promptBias: promptBias,
                 finalPromt: finalPrompt,
+=======
+                mesSendString: mesSend.join(''),
+                generatedPromtCache: generatedPromtCache,
+                promptBias: promptBias,
+                finalPromt: finalPromt,
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 charDescription: charDescription,
                 charPersonality: charPersonality,
                 scenarioText: scenarioText,
@@ -3007,7 +3192,11 @@ async function Generate(type, { automatic_trigger, force_name2, resolve, reject,
                 }
             }
             else if (main_api == 'koboldhorde') {
+<<<<<<< HEAD
                 generateHorde(finalPrompt, generate_data, abortController.signal).then(onSuccess).catch(onError);
+=======
+                generateHorde(finalPromt, generate_data, abortController.signal).then(onSuccess).catch(onError);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             }
             else if (main_api == 'textgenerationwebui' && isStreamingEnabled() && type !== 'quiet') {
                 streamingProcessor.generator = await generateTextGenWithStreaming(generate_data, streamingProcessor.abortController.signal);
@@ -3278,9 +3467,15 @@ export function getBiasStrings(textareaText, type) {
 /**
  * @param {Object} chatItem Message history item.
  * @param {boolean} isInstruct Whether instruct mode is enabled.
+<<<<<<< HEAD
  * @param {boolean|number} forceOutputSequence Whether to force the first/last output sequence for instruct mode.
  */
 function formatMessageHistoryItem(chatItem, isInstruct, forceOutputSequence) {
+=======
+ * @param {boolean} forceLastOutputSequence Whether to force the last output sequence for instruct mode.
+ */
+function formatMessageHistoryItem(chatItem, isInstruct, forceLastOutputSequence) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const isNarratorType = chatItem?.extra?.type === system_message_types.NARRATOR;
     const characterName = (selected_group || chatItem.force_avatar) ? chatItem.name : name2;
     const itemName = chatItem.is_user ? chatItem['name'] : characterName;
@@ -3289,7 +3484,11 @@ function formatMessageHistoryItem(chatItem, isInstruct, forceOutputSequence) {
     let textResult = shouldPrependName ? `${itemName}: ${chatItem.mes}\n` : `${chatItem.mes}\n`;
 
     if (isInstruct) {
+<<<<<<< HEAD
         textResult = formatInstructModeChat(itemName, chatItem.mes, chatItem.is_user, isNarratorType, chatItem.force_avatar, name1, name2, forceOutputSequence);
+=======
+        textResult = formatInstructModeChat(itemName, chatItem.mes, chatItem.is_user, isNarratorType, chatItem.force_avatar, name1, name2, forceLastOutputSequence);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 
     textResult = replaceBiasMarkup(textResult);
@@ -3391,7 +3590,15 @@ function addChatsPreamble(mesSendString) {
 }
 
 function addChatsSeparator(mesSendString) {
+<<<<<<< HEAD
     if (power_user.context.chat_start) {
+=======
+    if (main_api === 'novel') {
+        return '***\n' + mesSendString;
+    }
+
+    else if (power_user.context.chat_start) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         return power_user.context.chat_start + '\n' + mesSendString;
     }
 
@@ -3858,10 +4065,13 @@ async function saveReply(type, getMessage, this_mes_is_name, title) {
         type = 'normal';
     }
 
+<<<<<<< HEAD
     if (chat.length && typeof chat[chat.length - 1]['extra'] !== 'object') {
         chat[chat.length - 1]['extra'] = {};
     }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     let oldMessage = ''
     const generationFinished = new Date();
     const img = extractImageFromMessage(getMessage);
@@ -3951,9 +4161,14 @@ async function saveReply(type, getMessage, this_mes_is_name, title) {
         item["swipe_info"] = [];
     }
     if (item["swipe_id"] !== undefined) {
+<<<<<<< HEAD
         const swipeId = item["swipe_id"];
         item["swipes"][swipeId] = item["mes"];
         item["swipe_info"][swipeId] = {
+=======
+        item["swipes"][item["swipes"].length - 1] = item["mes"];
+        item["swipe_info"][item["swipes"].length - 1] = {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             send_date: item["send_date"],
             gen_started: item["gen_started"],
             gen_finished: item["gen_finished"],
@@ -4060,10 +4275,13 @@ export function setMenuType(value) {
     menu_type = value;
 }
 
+<<<<<<< HEAD
 export function setExternalAbortController(controller) {
     abortController = controller;
 }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 function setCharacterId(value) {
     this_chid = value;
 }
@@ -4424,6 +4642,7 @@ function getFirstMessage() {
     const message = {
         name: name2,
         is_user: false,
+<<<<<<< HEAD
         is_system: false,
         is_name: true,
         send_date: getMessageTimeStamp(),
@@ -4435,6 +4654,20 @@ function getFirstMessage() {
         const swipes = [message.mes, ...(alternateGreetings.map(greeting => substituteParams(getRegexedString(greeting, regex_placement.AI_OUTPUT))))];
         message['swipe_id'] = 0;
         message['swipes'] = swipes;
+=======
+        is_name: true,
+        send_date: getMessageTimeStamp(),
+        mes: getRegexedString(firstMes, regex_placement.AI_OUTPUT),
+    };
+
+    if (Array.isArray(alternateGreetings) && alternateGreetings.length > 0) {
+        message['swipe_id'] = 0;
+        message['swipes'] = message['mes'].concat(
+            alternateGreetings.map(
+                (greeting) => substituteParams(getRegexedString(greeting, regex_placement.AI_OUTPUT))
+            )
+        );
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         message['swipe_info'] = [];
     }
     return message;
@@ -5876,6 +6109,7 @@ function select_rm_create() {
 }
 
 function select_rm_characters() {
+<<<<<<< HEAD
     const doFullRefresh = menu_type === 'characters';
     menu_type = "characters";
     selectRightMenuWithAnimation('rm_characters_block');
@@ -5898,6 +6132,17 @@ function setExtensionPrompt(key, value, position, depth) {
  * @param {Object} newValues An object with collection of new values to be added into the metadata.
  * @param {boolean} reset Should a metadata be reset by this call.
  */
+=======
+    menu_type = "characters";
+    selectRightMenuWithAnimation('rm_characters_block');
+    printCharacters(false); // Do a quick refresh of the characters list
+}
+
+function setExtensionPrompt(key, value, position, depth) {
+    extension_prompts[key] = { value, position, depth };
+}
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 function updateChatMetadata(newValues, reset) {
     chat_metadata = reset ? { ...newValues } : { ...chat_metadata, ...newValues };
 }
@@ -6357,7 +6602,10 @@ function openCharacterWorldPopup() {
     template.find('.character_name').text(name);
 
     // Not needed on mobile
+<<<<<<< HEAD
     const deviceInfo = getDeviceInfo();
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     if (deviceInfo && deviceInfo.device.type === 'desktop') {
         $(extraSelect).select2({
             width: '100%',
@@ -6402,6 +6650,21 @@ function openCharacterWorldPopup() {
             return;
         }
 
+<<<<<<< HEAD
+=======
+        /*let selectScrollTop = null;
+
+        if (deviceInfo && deviceInfo.device.type === 'desktop') {
+            e.preventDefault();
+            const option = $(e.target);
+            const selectElement = $(extraSelect)[0];
+            selectScrollTop = selectElement.scrollTop;
+            option.prop('selected', !option.prop('selected'));
+            await delay(1);
+            selectElement.scrollTop = selectScrollTop;
+        }*/
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         onExtraWorldInfoChanged();
     });
 
@@ -8095,27 +8358,48 @@ $(document).ready(function () {
     var sliderTimer;
 
     $("input[type='range']").on("touchstart", function () {
+<<<<<<< HEAD
         // Unlock the slider after 300ms
         setTimeout(function () {
             sliderLocked = false;
             $(this).css('background-color', 'var(--SmartThemeQuoteColor)');
         }.bind(this), 300);
+=======
+        // Unlock the slider after 500ms
+        sliderTimer = setTimeout(function () {
+            sliderLocked = false;
+        }, 500);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     });
 
     $("input[type='range']").on("touchend", function () {
         clearTimeout(sliderTimer);
+<<<<<<< HEAD
         $(this).css('background-color', '');
         sliderLocked = true;
+=======
+        $(this).css('background-color', '')
+        sliderLocked = true
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     });
 
     $("input[type='range']").on("touchmove", function (event) {
         if (sliderLocked) {
             event.preventDefault();
         }
+<<<<<<< HEAD
     });
 
 
 
+=======
+        else {
+            $(this).css('background-color', 'var(--SmartThemeQuoteColor)')
+        }
+    });
+
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const sliders = [
         {
             sliderId: "#amount_gen",
@@ -8681,10 +8965,13 @@ $(document).ready(function () {
                 });
             }
 
+<<<<<<< HEAD
             // Set the height of "autoSetHeight" textareas within the drawer to their scroll height
             $(this).closest('.drawer').find('.drawer-content textarea.autoSetHeight').each(function() {
                 resetScrollHeight($(this));
            });
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
         } else if (drawerWasOpenAlready) { //to close manually
             icon.toggleClass('closedIcon openIcon');
@@ -8751,11 +9038,14 @@ $(document).ready(function () {
         icon.toggleClass('down up');
         icon.toggleClass('fa-circle-chevron-down fa-circle-chevron-up');
         $(this).closest('.inline-drawer').find('.inline-drawer-content').stop().slideToggle();
+<<<<<<< HEAD
 
         // Set the height of "autoSetHeight" textareas within the inline-drawer to their scroll height
         $(this).closest('.inline-drawer').find('.inline-drawer-content textarea.autoSetHeight').each(function() {
             resetScrollHeight($(this));
         });
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     });
 
     $(document).on('click', '.mes .avatar', function () {
@@ -9083,8 +9373,11 @@ $(document).ready(function () {
     $("#hideCharPanelAvatarButton").on('click', () => {
         $('#avatar-and-name-block').slideToggle()
     });
+<<<<<<< HEAD
 
     // Added here to prevent execution before script.js is loaded and get rid of quirky timeouts
     initAuthorsNote();
     initRossMods();
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 });

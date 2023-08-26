@@ -98,6 +98,7 @@ export function humanizeGenTime(total_gen_time) {
     return time_spent;
 }
 
+<<<<<<< HEAD
 /**
  * Checks if the device is a mobile device.
  * @returns {boolean} - True if the device is a mobile device, false otherwise.
@@ -135,6 +136,28 @@ export function getDeviceInfo() {
         });
     }
     return deviceInfo;
+=======
+
+
+// Device detection
+export const deviceInfo = await getDeviceInfo();
+
+async function getDeviceInfo() {
+    try {
+        const deviceInfo = await (await fetch('/deviceinfo')).json();
+        console.log("Device type: " + deviceInfo?.device?.type);
+        return deviceInfo;
+    }
+    catch {
+        console.log("Couldn't load device info. Defaulting to desktop");
+        return { device: { type: 'desktop' } };
+    }
+}
+
+export function isMobile() {
+    const mobileTypes = ['smartphone', 'tablet', 'phablet', 'feature phone', 'portable media player'];
+    return mobileTypes.includes(deviceInfo?.device?.type);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 function shouldSendOnEnter() {
@@ -411,8 +434,13 @@ function isUrlOrAPIKey(string) {
 }
 
 function OpenNavPanels() {
+<<<<<<< HEAD
     const deviceInfo = getDeviceInfo();
     if (deviceInfo && deviceInfo.device.type === 'desktop') {
+=======
+
+    if (deviceInfo.device.type === 'desktop') {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         //auto-open R nav if locked and previously open
         if (LoadLocalBool("NavLockOn") == true && LoadLocalBool("NavOpened") == true) {
             //console.log("RA -- clicking right nav to open");
@@ -686,7 +714,17 @@ export async function initMovingUI() {
 
 // ---------------------------------------------------
 
+<<<<<<< HEAD
 export function initRossMods() {
+=======
+jQuery(async function () {
+    try {
+        await waitUntilCondition(() => online_status !== undefined, 1000, 10);
+    } catch {
+        console.log('Timeout waiting for online_status');
+    }
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     // initial status check
     setTimeout(() => {
         RA_checkOnlineStatus();
@@ -854,7 +892,11 @@ export function initRossMods() {
 
     //this makes the chat input text area resize vertically to match the text size (limited by CSS at 50% window height)
     $('#send_textarea').on('input', function () {
+<<<<<<< HEAD
         this.style.height = window.getComputedStyle(this).getPropertyValue('min-height');
+=======
+        this.style.height = '30px';
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         this.style.height = (this.scrollHeight) + 'px';
     });
 
@@ -1081,4 +1123,8 @@ export function initRossMods() {
             console.log("Ctrl +" + event.key + " pressed!");
         }
     }
+<<<<<<< HEAD
 }
+=======
+});
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0

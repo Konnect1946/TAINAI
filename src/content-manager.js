@@ -1,10 +1,15 @@
 const fs = require('fs');
+<<<<<<< HEAD
 const path = require('path');
+=======
+const path=  require('path');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 const config = require(path.join(process.cwd(), './config.conf'));
 const contentDirectory = path.join(process.cwd(), 'default/content');
 const contentLogPath = path.join(contentDirectory, 'content.log');
 const contentIndexPath = path.join(contentDirectory, 'index.json');
 
+<<<<<<< HEAD
 const unsafeExtensions = [
     ".php",
     ".exe",
@@ -82,6 +87,8 @@ const unsafeExtensions = [
     ".ws",
 ];
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 function checkForNewContent() {
     try {
         if (config.skipContentCheck) {
@@ -162,5 +169,8 @@ function getContentLog() {
 
 module.exports = {
     checkForNewContent,
+<<<<<<< HEAD
     unsafeExtensions,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }

@@ -55,9 +55,12 @@ const defaultSettings = {
 }
 
 function loadSettings() {
+<<<<<<< HEAD
     if (extension_settings.rvc === undefined)
         extension_settings.rvc = {};
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     if (Object.keys(extension_settings.rvc).length === 0) {
         Object.assign(extension_settings.rvc, defaultSettings)
     }
@@ -177,9 +180,15 @@ async function onDeleteClick() {
     saveSettingsDebounced();
 }
 
+<<<<<<< HEAD
 async function onChangeUploadFiles() {
     const url = new URL(getApiUrl());
     const inputFiles = $("#rvc_model_upload_files").get(0).files;
+=======
+async function onClickUpload() {
+    const url = new URL(getApiUrl());
+    const inputFiles = $("#rvc_model_upload_file").get(0).files;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     let formData = new FormData();
 
     for (const file of inputFiles)
@@ -198,7 +207,11 @@ async function onChangeUploadFiles() {
         throw new Error(`HTTP ${apiResult.status}: ${await apiResult.text()}`);
     }
 
+<<<<<<< HEAD
     alert('The files have been uploaded successfully.');
+=======
+    alert('The file has been uploaded successfully.');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 $(document).ready(function () {
@@ -211,7 +224,10 @@ $(document).ready(function () {
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
+<<<<<<< HEAD
                     <h4 class="center">Characters Voice Mapping</h4>
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                     <div>
                         <label class="checkbox_label" for="rvc_enabled">
                             <input type="checkbox" id="rvc_enabled" name="rvc_enabled">
@@ -222,6 +238,7 @@ $(document).ready(function () {
                             placeholder="Voice map will appear here for debug purpose"></textarea>
                     </div>
                     <div>
+<<<<<<< HEAD
                         <div class="background_controls">
                             <label for="rvc_character_select">Character:</label>
                             <select id="rvc_character_select">
@@ -315,10 +332,59 @@ $(document).ready(function () {
                                 Avoid non voice sounds. Lower is more being ignored.
                             </small>
                         </div>
+=======
+                        <label for="rvc_character_select">Character:</label>
+                        <select id="rvc_character_select">
+                            <!-- Populated by JS -->
+                        </select>
+                        <label for="rvc_model_select">Voice:</label>
+                        <select id="rvc_model_select">
+                            <!-- Populated by JS -->
+                        </select>
+                        <div>
+                            <label for="rvc_model_upload_file">Select models to upload (zip files)</label>
+                            <input
+                                type="file"
+                                id="rvc_model_upload_file"
+                                accept=".zip,.rar,.7zip,.7z" multiple />
+                            <button id="rvc_model_upload_button"> Upload </button>
+                            <button id="rvc_model_refresh_button"> Refresh Voices </button>
+                        </div>
+                        <span>Select Pitch Extraction</span> </br>
+                        <select id="rvc_pitch_extraction">
+                            <option value="dio">dio</option>
+                            <option value="pm">pm</option>
+                            <option value="harvest">harvest</option>
+                            <option value="torchcrepe">torchcrepe</option>
+                            <option value="rmvpe">rmvpe</option>
+                            <option value="">None</option>
+                        </select>
+                        <label for="rvc_index_rate">
+                            Index rate for feature retrieval (<span id="rvc_index_rate_value"></span>)
+                        </label>
+                        <input id="rvc_index_rate" type="range" min="0" max="1" step="0.01" value="0.5" />
+
+                        <label for="rvc_filter_radius">Filter radius (<span id="rvc_filter_radius_value"></span>)</label>
+                        <input id="rvc_filter_radius" type="range" min="0" max="7" step="1" value="3" />
+
+                        <label for="rvc_pitch_offset">Pitch offset (<span id="rvc_pitch_offset_value"></span>)</label>
+                        <input id="rvc_pitch_offset" type="range" min="-100" max="100" step="1" value="0" />
+
+                        <label for="rvc_rms_mix_rate">Mix rate (<span id="rvc_rms_mix_rate_value"></span>)</label>
+                        <input id="rvc_rms_mix_rate" type="range" min="0" max="1" step="0.01" value="1" />
+
+                        <label for="rvc_protect">Protect amount (<span id="rvc_protect_value"></span>)</label>
+                        <input id="rvc_protect" type="range" min="0" max="1" step="0.01" value="0.33" />
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                         <div id="rvc_status">
                         </div>
                         <div class="rvc_buttons">
                             <input id="rvc_apply" class="menu_button" type="submit" value="Apply" />
+<<<<<<< HEAD
+=======
+                            <input id="rvc_delete" class="menu_button" type="submit" value="Delete" />
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                         </div>
                     </div>
                 </div>
@@ -337,11 +403,16 @@ $(document).ready(function () {
         $("#rvc_apply").on("click", onApplyClick);
         $("#rvc_delete").on("click", onDeleteClick);
 
+<<<<<<< HEAD
         $("#rvc_model_upload_files").hide();
         $("#rvc_model_upload_select_button").on("click", function() {$("#rvc_model_upload_files").click()});
 
         $("#rvc_model_upload_files").on("change", onChangeUploadFiles);
         //$("#rvc_model_upload_button").on("click", onClickUpload);
+=======
+        $("#rvc_model_upload_file").show();
+        $("#rvc_model_upload_button").on("click", onClickUpload);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         $("#rvc_model_refresh_button").on("click", refreshVoiceList);
 
     }
@@ -379,7 +450,11 @@ async function get_models_list(model_id) {
 /*
     Send an audio file to RVC to convert voice
 */
+<<<<<<< HEAD
 async function rvcVoiceConversion(response, character, text) {
+=======
+async function rvcVoiceConversion(response, character) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     let apiResult
 
     // Check voice map
@@ -397,6 +472,11 @@ async function rvcVoiceConversion(response, character, text) {
 
     const voice_settings = extension_settings.rvc.voiceMap[character];
 
+<<<<<<< HEAD
+=======
+    console.log("Sending tts audio data to RVC on extras server")
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     var requestData = new FormData();
     requestData.append('AudioFile', audioData, 'record');
     requestData.append("json", JSON.stringify({
@@ -406,12 +486,18 @@ async function rvcVoiceConversion(response, character, text) {
         "indexRate": voice_settings["indexRate"],
         "filterRadius": voice_settings["filterRadius"],
         "rmsMixRate": voice_settings["rmsMixRate"],
+<<<<<<< HEAD
         "protect": voice_settings["protect"],
         "text": text
     }));
 
     console.log("Sending tts audio data to RVC on extras server",requestData)
 
+=======
+        "protect": voice_settings["protect"]
+    }));
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const url = new URL(getApiUrl());
     url.pathname = '/api/voice-conversion/rvc/process-audio';
 
@@ -462,6 +548,7 @@ async function moduleWorker() {
 
 function updateCharactersList() {
     let currentcharacters = new Set();
+<<<<<<< HEAD
     const context = getContext();
     for (const i of context.characters) {
         currentcharacters.add(i.name);
@@ -469,6 +556,13 @@ function updateCharactersList() {
 
     currentcharacters = Array.from(currentcharacters);
     currentcharacters.unshift(context.name1);
+=======
+    for (const i of getContext().characters) {
+        currentcharacters.add(i.name);
+    }
+
+    currentcharacters = Array.from(currentcharacters)
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
     if (JSON.stringify(charactersList) !== JSON.stringify(currentcharacters)) {
         charactersList = currentcharacters

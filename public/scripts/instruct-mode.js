@@ -6,7 +6,10 @@ import {
     power_user,
     context_presets,
 } from "./power-user.js";
+<<<<<<< HEAD
 import { resetScrollHeight } from "./utils.js";
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
 /**
  * @type {any[]} Instruct mode presets.
@@ -17,8 +20,12 @@ const controls = [
     { id: "instruct_enabled", property: "enabled", isCheckbox: true },
     { id: "instruct_wrap", property: "wrap", isCheckbox: true },
     { id: "instruct_system_prompt", property: "system_prompt", isCheckbox: false },
+<<<<<<< HEAD
     { id: "instruct_system_sequence_prefix", property: "system_sequence_prefix", isCheckbox: false },
     { id: "instruct_system_sequence_suffix", property: "system_sequence_suffix", isCheckbox: false },
+=======
+    { id: "instruct_system_sequence", property: "system_sequence", isCheckbox: false },
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     { id: "instruct_separator_sequence", property: "separator_sequence", isCheckbox: false },
     { id: "instruct_input_sequence", property: "input_sequence", isCheckbox: false },
     { id: "instruct_output_sequence", property: "output_sequence", isCheckbox: false },
@@ -26,7 +33,10 @@ const controls = [
     { id: "instruct_names", property: "names", isCheckbox: true },
     { id: "instruct_macro", property: "macro", isCheckbox: true },
     { id: "instruct_names_force_groups", property: "names_force_groups", isCheckbox: true },
+<<<<<<< HEAD
     { id: "instruct_first_output_sequence", property: "first_output_sequence", isCheckbox: false },
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     { id: "instruct_last_output_sequence", property: "last_output_sequence", isCheckbox: false },
     { id: "instruct_activation_regex", property: "activation_regex", isCheckbox: false },
 ];
@@ -56,9 +66,12 @@ export function loadInstructMode(data) {
         $element.on('input', function () {
             power_user.instruct[control.property] = control.isCheckbox ? !!$(this).prop('checked') : $(this).val();
             saveSettingsDebounced();
+<<<<<<< HEAD
             if (!control.isCheckbox) {
                 resetScrollHeight($element);
             }
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         });
     });
 
@@ -90,7 +103,11 @@ function selectContextPreset(preset) {
     }
 
     // If instruct mode is disabled, enable it, except for default context template
+<<<<<<< HEAD
     if (!power_user.instruct.enabled && preset !== power_user.default_context) {
+=======
+    if (!power_user.instruct.enabled && preset !== 'Default') {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         power_user.instruct.enabled = true;
         $('#instruct_enabled').prop('checked', true).trigger('change');
         toastr.info(`Instruct Mode enabled`);
@@ -206,10 +223,16 @@ export function getInstructStoppingSequences() {
     if (power_user.instruct.enabled) {
         const input_sequence = power_user.instruct.input_sequence;
         const output_sequence = power_user.instruct.output_sequence;
+<<<<<<< HEAD
         const first_output_sequence = power_user.instruct.first_output_sequence;
         const last_output_sequence = power_user.instruct.last_output_sequence;
 
         const combined_sequence = `${input_sequence}\n${output_sequence}\n${first_output_sequence}\n${last_output_sequence}`;
+=======
+        const last_output_sequence = power_user.instruct.last_output_sequence;
+
+        const combined_sequence = `${input_sequence}\n${output_sequence}\n${last_output_sequence}`;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
         combined_sequence.split('\n').filter((line, index, self) => self.indexOf(line) === index).forEach(addInstructSequence);
     }
@@ -217,11 +240,14 @@ export function getInstructStoppingSequences() {
     return result;
 }
 
+<<<<<<< HEAD
 export const force_output_sequence = {
     FIRST: 1,
     LAST: 2,
 }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 /**
  * Formats instruct mode chat message.
  * @param {string} name Character name.
@@ -231,10 +257,17 @@ export const force_output_sequence = {
  * @param {string} forceAvatar Force avatar string.
  * @param {string} name1 User name.
  * @param {string} name2 Character name.
+<<<<<<< HEAD
  * @param {boolean|number} forceOutputSequence Force to use first/last output sequence (if configured).
  * @returns {string} Formatted instruct mode chat message.
  */
 export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar, name1, name2, forceOutputSequence) {
+=======
+ * @param {boolean} forceLastOutputSequence Force to use last outline sequence (if configured).
+ * @returns {string} Formatted instruct mode chat message.
+ */
+export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvatar, name1, name2, forceLastOutputSequence) {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     let includeNames = isNarrator ? false : power_user.instruct.names;
 
     if (!isNarrator && power_user.instruct.names_force_groups && (selected_group || forceAvatar)) {
@@ -243,12 +276,17 @@ export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvata
 
     let sequence = (isUser || isNarrator) ? power_user.instruct.input_sequence : power_user.instruct.output_sequence;
 
+<<<<<<< HEAD
     if (forceOutputSequence && sequence === power_user.instruct.output_sequence) {
         if (forceOutputSequence === force_output_sequence.FIRST && power_user.instruct.first_output_sequence) {
             sequence = power_user.instruct.first_output_sequence;
         } else if (forceOutputSequence === force_output_sequence.LAST && power_user.instruct.last_output_sequence) {
             sequence = power_user.instruct.last_output_sequence;
         }
+=======
+    if (sequence === power_user.instruct.output_sequence && forceLastOutputSequence && power_user.instruct.last_output_sequence) {
+        sequence = power_user.instruct.last_output_sequence;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 
     if (power_user.instruct.macro) {
@@ -270,6 +308,7 @@ export function formatInstructModeChat(name, mes, isUser, isNarrator, forceAvata
  * @returns {string} Formatted instruct mode system prompt.
  */
 export function formatInstructModeSystemPrompt(systemPrompt){
+<<<<<<< HEAD
     const separator = power_user.instruct.wrap ? '\n' : '';
 
     if (power_user.instruct.system_sequence_prefix) {
@@ -278,6 +317,11 @@ export function formatInstructModeSystemPrompt(systemPrompt){
 
     if (power_user.instruct.system_sequence_suffix) {
         systemPrompt = systemPrompt + separator + power_user.instruct.system_sequence_suffix;
+=======
+    if (power_user.instruct.system_sequence) {
+        const separator = power_user.instruct.wrap ? '\n' : '';
+        return power_user.instruct.system_sequence + separator + systemPrompt;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 
     return systemPrompt;
@@ -359,7 +403,11 @@ jQuery(() => {
             $('#instruct_presets').trigger('change');
         // When instruct mode gets disabled, select default context preset
         } else {
+<<<<<<< HEAD
             selectContextPreset(power_user.default_context);
+=======
+            selectContextPreset('Default');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         }
     });
 
@@ -397,7 +445,11 @@ jQuery(() => {
         }
         if (!foundMatch) {
             // If no match was found, select default context preset
+<<<<<<< HEAD
             selectContextPreset(power_user.default_context);
+=======
+            selectContextPreset('Default');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         }
 
         highlightDefaultPreset();

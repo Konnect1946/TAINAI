@@ -129,7 +129,10 @@
         "prefer_character_prompt": true,
         "prefer_character_jailbreak": true,
         "quick_continue": false,
+<<<<<<< HEAD
         "continue_on_send": false,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "trim_spaces": true,
         "relaxed_api_urls": false,
         "default_instruct": "",
@@ -139,10 +142,15 @@
             "system_prompt": "Avoid repetition, don't loop. Develop the plot slowly, always stay in character. Describe all actions in full, elaborate, explicit, graphic, and vivid detail. Mention all relevant sensory perceptions.",
             "input_sequence": "\n### Instruction:",
             "output_sequence": "\n### Response:",
+<<<<<<< HEAD
             "first_output_sequence": "",
             "last_output_sequence": "\n### Response (2 paragraphs, engaging, natural, authentic, descriptive, creative):",
             "system_sequence_prefix": "",
             "system_sequence_suffix": "",
+=======
+            "last_output_sequence": "\n### Response (2 paragraphs, engaging, natural, authentic, descriptive, creative):",
+            "system_sequence": "",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             "stop_sequence": "",
             "separator_sequence": "",
             "wrap": true,
@@ -151,7 +159,10 @@
             "names_force_groups": true,
             "activation_regex": ""
         },
+<<<<<<< HEAD
         "default_context": "Default",
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         "context": {
             "preset": "Default",
             "story_string": "{{#if system}}{{system}}\n{{/if}}{{#if wiBefore}}{{wiBefore}}\n{{/if}}{{#if description}}{{description}}\n{{/if}}{{#if personality}}{{char}}'s personality: {{personality}}\n{{/if}}{{#if scenario}}Scenario: {{scenario}}\n{{/if}}{{#if wiAfter}}{{wiAfter}}\n{{/if}}{{#if persona}}{{persona}}\n{{/if}}",

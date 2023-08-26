@@ -6,4 +6,7 @@ Start.bat
 /dist
 /backups/
 cloudflared.exe
+<<<<<<< HEAD
 access.log
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0

@@ -1,14 +1,26 @@
 {
+<<<<<<< HEAD
     "temp": 0.7,
     "top_p": 0.5,
     "top_k": 40,
     "typical_p": 1,
+=======
+    "temp": 0.8,
+    "top_p": 0.9,
+    "top_k": 30,
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     "top_a": 0,
     "tfs": 1,
     "epsilon_cutoff": 0,
     "eta_cutoff": 0,
+<<<<<<< HEAD
     "rep_pen": 1.2,
     "rep_pen_range": 0,
+=======
+    "typical_p": 1,
+    "rep_pen": 1.1,
+    "rep_pen_range": 2048,
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     "no_repeat_ngram_size": 0,
     "penalty_alpha": 0,
     "num_beams": 1,
@@ -17,7 +29,25 @@
     "encoder_rep_pen": 1,
     "do_sample": true,
     "early_stopping": false,
+<<<<<<< HEAD
     "mirostat_mode": 0,
     "mirostat_tau": 5,
     "mirostat_eta": 0.1
 }
+=======
+    "seed": -1,
+    "add_bos_token": true,
+    "truncation_length": 2048,
+    "ban_eos_token": false,
+    "skip_special_tokens": true,
+    "streaming": false,
+    "mirostat_mode": 2,
+    "mirostat_tau": 4.1,
+    "mirostat_eta": 0.4,
+    "guidance_scale": 1,
+    "negative_prompt": "",
+    "rep_pen_size": 0,
+    "genamt": 320,
+    "max_length": 7400
+}
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { callPopup, eventSource, event_types, saveSettings, saveSettingsDebounced, getRequestHeaders, substituteParams, renderTemplate } from "../script.js";
 import { isSubsetOf } from "./utils.js";
+=======
+import { callPopup, eventSource, event_types, saveSettings, saveSettingsDebounced, getRequestHeaders, substituteParams } from "../script.js";
+import { isSubsetOf, debounce, waitUntilCondition } from "./utils.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 export {
     getContext,
     getApiUrl,
@@ -49,6 +54,7 @@ export function saveMetadataDebounced() {
 export const extensionsHandlebars = Handlebars.create();
 
 /**
+<<<<<<< HEAD
  * Provides an ability for extensions to render HTML templates.
  * Templates sanitation and localization is forced.
  * @param {string} extensionName Extension name
@@ -61,6 +67,8 @@ export function renderExtensionTemplate(extensionName, templateId, templateData 
 }
 
 /**
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
  * Registers a Handlebars helper for use in extensions.
  * @param {string} name Handlebars helper name
  * @param {function} helper Handlebars helper function
@@ -711,8 +719,15 @@ async function runGenerationInterceptors(chat, contextSize) {
 }
 
 jQuery(function () {
+<<<<<<< HEAD
     addExtensionsButtonAndMenu();
     $("#extensionsMenuButton").css("display", "flex");
+=======
+    setTimeout(async function () {
+        addExtensionsButtonAndMenu();
+        $("#extensionsMenuButton").css("display", "flex");
+    }, 100)
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
     $("#extensions_connect").on('click', connectClickHandler);
     $("#extensions_autoconnect").on('input', autoConnectInputHandler);

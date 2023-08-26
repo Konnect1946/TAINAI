@@ -3,7 +3,11 @@ import { download, debounce, initScrollHeight, resetScrollHeight, parseJsonFile,
 import { getContext } from "./extensions.js";
 import { NOTE_MODULE_NAME, metadata_keys, shouldWIAddPrompt } from "./authors-note.js";
 import { registerSlashCommand } from "./slash-commands.js";
+<<<<<<< HEAD
 import { getDeviceInfo } from "./RossAscends-mods.js";
+=======
+import { deviceInfo } from "./RossAscends-mods.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import { FILTER_TYPES, FilterHelper } from "./filters.js";
 import { getTokenCount } from "./tokenizers.js";
 
@@ -1621,8 +1625,12 @@ jQuery(() => {
     });
 
     // Not needed on mobile
+<<<<<<< HEAD
     const deviceInfo = getDeviceInfo();
     if (deviceInfo && deviceInfo.device.type === 'desktop') {
+=======
+    if (deviceInfo.device.type === 'desktop') {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         $('#world_info').select2({
             width: '100%',
             placeholder: 'No Worlds active. Click here to select.',

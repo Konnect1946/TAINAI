@@ -67,6 +67,7 @@
 
     color-scheme: only light;
 
+<<<<<<< HEAD
     /* Send form variables */
     --bottomFormBlockPadding: calc(var(--mainFontSize) / 3);
     --bottomFormIconSize: calc(var(--mainFontSize) * 2);
@@ -76,6 +77,8 @@
     --topBarIconSize: calc(var(--mainFontSize) * 2);
     --topBarBlockSize: calc(var(--topBarIconSize) + var(--topBarBlockPadding));
     --topBarBlockPadding: calc(var(--mainFontSize) / 3);
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
     /*styles for the color picker*/
     --tool-cool-color-picker-btn-bg: transparent;
@@ -386,7 +389,11 @@ hr {
     left: 0;
     right: 0;
     display: inline-block;
+<<<<<<< HEAD
     height: var(--bottomFormBlockSize);
+=======
+    height: 35px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     position: absolute;
     border-bottom: 1px solid var(--grey30a);
     box-shadow: 0 2px 20px 0 var(--black70a);
@@ -399,15 +406,24 @@ hr {
 #sheld {
     display: grid;
     grid-template-rows: auto min-content;
+<<<<<<< HEAD
     height: calc(100vh - var(--topBarBlockSize));
     height: calc(100svh - var(--topBarBlockSize));
     max-height: calc(100svh - var(--topBarBlockSize));
+=======
+    height: calc(100vh - 36px);
+    height: calc(100svh - 36px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     overflow-x: hidden;
     /* max-width: 50vw; */
     position: absolute;
     left: calc((100vw - var(--sheldWidth))/2);
     left: calc((100svw - var(--sheldWidth))/2);
+<<<<<<< HEAD
     top: var(--topBarBlockSize);
+=======
+    top: 36px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     margin: 0 auto;
     left: 0;
     right: 0;
@@ -472,7 +488,11 @@ hr {
 }
 
 #chat {
+<<<<<<< HEAD
     max-height: calc(100vh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
+=======
+    max-height: calc(100vh - 42px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     overflow-x: hidden;
     padding-bottom: 0;
     overflow-y: scroll;
@@ -523,19 +543,32 @@ hr {
 #send_but_sheld {
     padding: 0;
     border: 0;
+<<<<<<< HEAD
     height: var(--bottomFormBlockSize);
+=======
+    height: 30px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     position: relative;
     background-position: center;
     display: flex;
     flex-direction: row;
     column-gap: 5px;
+<<<<<<< HEAD
     font-size: var(--bottomFormIconSize);
+=======
+    font-size: 25px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     overflow: hidden;
 }
 
 #send_but_sheld>div {
+<<<<<<< HEAD
     width: var(--bottomFormBlockSize);
     height: var(--bottomFormBlockSize);
+=======
+    width: 30px;
+    height: 30px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     margin: 0;
     outline: none;
     border: none;
@@ -566,9 +599,14 @@ hr {
 }
 
 #options_button {
+<<<<<<< HEAD
     width: var(--bottomFormBlockSize);
     height: var(--bottomFormBlockSize);
     font-size: var(--bottomFormIconSize);
+=======
+    width: 30px;
+    height: 30px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     margin: 0;
     outline: none;
     border: none;
@@ -579,6 +617,10 @@ hr {
     margin-left: 10px;
     padding: 0;
     transition: 0.3s;
+<<<<<<< HEAD
+=======
+    font-size: 25px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     display: flex;
     align-items: center;
 }
@@ -889,11 +931,19 @@ select {
 }
 
 #send_textarea {
+<<<<<<< HEAD
     min-height: var(--bottomFormBlockSize);
     height: var(--bottomFormBlockSize);
     max-height: 50vh;
     max-height: 50svh;
     word-wrap: break-word;
+=======
+    min-height: 30px;
+    max-height: 50vh;
+    max-height: 50svh;
+    word-wrap: break-word;
+    height: 30px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     resize: vertical;
     display: block;
     background-color: rgba(255, 0, 0, 0);
@@ -916,6 +966,7 @@ select {
     white-space: nowrap;
 }
 
+<<<<<<< HEAD
 @media screen and (max-width: 1000px) {
     #form_create textarea {
         flex-grow: 1;
@@ -932,6 +983,14 @@ select {
         resize: none;
         flex: 1;
     }
+=======
+
+
+#description_textarea,
+#firstmessage_textarea {
+    height: -webkit-fill-available;
+    width: -moz-available;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 #character_name_pole {
@@ -1291,10 +1350,13 @@ select option:not(:checked) {
     color: var(--active) !important;
 }
 
+<<<<<<< HEAD
 #context_set_default.default {
     color: var(--preferred) !important;
 }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 #instruct_set_default.default {
     color: var(--preferred) !important;
 }
@@ -1564,6 +1626,13 @@ input[type=search]:focus::-webkit-search-cancel-button {
     overflow-y: auto;
 }
 
+<<<<<<< HEAD
+=======
+#form_create textarea {
+    flex-grow: 1;
+}
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 .avatar_div {
     display: flex;
     width: 100%;
@@ -2460,7 +2529,11 @@ input[type="range"]::-webkit-slider-thumb {
     margin-right: auto;
     left: 0;
     right: 0;
+<<<<<<< HEAD
     top: var(--topBarBlockSize);
+=======
+    top: 40px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     box-shadow: 0 0 20px var(--black70a);
     padding: 10px;
     border: 1px solid var(--black30a);
@@ -2545,8 +2618,13 @@ h5 {
     grid-template-rows: auto auto;
     max-width: var(--sheldWidth);
     height: min-content;
+<<<<<<< HEAD
     max-height: calc(100vh - var(--topBarBlockSize));
     max-height: calc(100svh - var(--topBarBlockSize));
+=======
+    max-height: calc(100vh - 40px);
+    max-height: calc(100svh - 40px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     min-height: 100px;
     position: absolute;
     z-index: 2066;
@@ -2907,10 +2985,17 @@ a {
 #right-nav-panel {
     width: calc((100vw - var(--sheldWidth) - 2px) /2);
     width: calc((100svw - var(--sheldWidth) - 2px) /2);
+<<<<<<< HEAD
     max-height: calc(100vh - var(--topBarBlockSize));
     max-height: calc(100svh - var(--topBarBlockSize));
     height: calc(100vh - var(--topBarBlockSize));
     height: calc(100svh - var(--topBarBlockSize));
+=======
+    max-height: calc(100vh - 42px);
+    max-height: calc(100svh - 42px);
+    height: calc(100vh - 42px);
+    height: calc(100svh - 42px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     position: fixed;
     top: 0;
     margin: 0;
@@ -3042,28 +3127,50 @@ a {
 /*------------ TOP SIDE SETTINGS ----------------*/
 
 #top-settings-holder {
+<<<<<<< HEAD
     display: flex;
     margin: 0 auto;
     height: var(--topBarBlockSize);
     justify-content: center;
     z-index: 3000;
     position: relative;
+=======
+    margin: 0 auto;
+    padding-top: 2px;
+    height: 30px;
+    /* max-width: var(--sheldWidth); */
+    justify-content: center;
+    display: grid;
+    grid-template-columns: 10% 10% 10% 10% 10% 10% 10% 10% 10%;
+    z-index: 3000;
+    position: relative;
+    grid-gap: 1%;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     width: var(--sheldWidth);
 
 }
 
 .drawer {
     align-items: center;
+<<<<<<< HEAD
     justify-content: center;
     display: flex;
     flex-flow: row;
+=======
+    display: flex;
+    flex-flow: column;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     width: 100%;
 }
 
 .drawer-icon {
     display: inline-block;
     cursor: pointer;
+<<<<<<< HEAD
     font-size: var(--topBarIconSize);
+=======
+    font-size: 25px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 .drawer-icon.openIcon {
@@ -3136,11 +3243,19 @@ a {
     min-width: 450px;
     width: var(--sheldWidth);
     overflow-y: auto;
+<<<<<<< HEAD
     max-height: calc(100vh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
     max-height: calc(100svh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
     display: none;
     position: absolute;
     top: var(--topBarBlockSize);
+=======
+    max-height: calc(100vh - 70px);
+    max-height: calc(100svh - 70px);
+    display: none;
+    position: absolute;
+    top: 41px;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     left: 0;
     right: 0;
     margin: 0 auto;
@@ -3162,10 +3277,17 @@ a {
 .fillLeft {
     width: calc((100vw - var(--sheldWidth) - 2px) /2);
     width: calc((100svw - var(--sheldWidth) - 2px) /2);
+<<<<<<< HEAD
     height: calc(100vh - var(--topBarBlockSize));
     height: calc(100svh - var(--topBarBlockSize));
     max-height: calc(100vh - var(--topBarBlockSize));
     max-height: calc(100svh - var(--topBarBlockSize));
+=======
+    height: calc(100vh - 42px);
+    height: calc(100svh - 42px);
+    max-height: calc(100vh - 42px);
+    max-height: calc(100svh - 42px);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     position: fixed;
     top: 0;
     margin: 0;

@@ -1,0 +1,37 @@
+{
+    "temperature": "1.00",
+    "repetition_penalty": 4.95,
+    "repetition_penalty_range": 8192,
+    "repetition_penalty_slope": 4.01,
+    "repetition_penalty_frequency": 0,
+    "repetition_penalty_presence": 0,
+    "tail_free_sampling": 0.972,
+    "top_k": 0,
+    "top_p": 1,
+    "top_a": 0.12,
+    "typical_p": 0.98,
+    "min_length": 1,
+    "preamble": "[ Style: chat, detailed, sensory, visceral ]",
+    "prefix": "vanilla",
+    "cfg_uc": "",
+    "banned_tokens": "",
+    "order": [
+        3,
+        4,
+        8,
+        0
+    ],
+    "logit_bias": [
+        {
+            "id": "accab28e-e333-4218-9610-520079797a53",
+            "text": "\n",
+            "value": -0.05
+        }
+    ],
+    "phrase_rep_pen": "medium",
+    "cfg_scale": 1.2,
+    "mirostat_lr": 0.645,
+    "mirostat_tau": 3.86,
+    "genamt": 150,
+    "max_length": 8000
+}

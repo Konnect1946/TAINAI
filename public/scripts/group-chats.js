@@ -8,7 +8,10 @@ import {
     extractAllWords,
     saveBase64AsFile,
     PAGINATION_TEMPLATE,
+<<<<<<< HEAD
     waitUntilCondition,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 } from './utils.js';
 import { RA_CountCharTokens, humanizedDateTime, dragElement, favsToHotswap, getMessageTimeStamp } from "./RossAscends-mods.js";
 import { loadMovingUIState, sortEntitiesList } from './power-user.js';
@@ -65,7 +68,10 @@ import {
     getCropPopup,
     system_avatar,
     isChatSaving,
+<<<<<<< HEAD
     setExternalAbortController,
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 } from "../script.js";
 import { appendTagToList, createTagMapFromList, getTagsList, applyTagsOnCharacterSelect, tag_map, printTagFilters } from './tags.js';
 import { FILTER_TYPES, FilterHelper } from './filters.js';
@@ -136,9 +142,13 @@ async function regenerateGroup() {
         await deleteLastMessage();
     }
 
+<<<<<<< HEAD
     const abortController = new AbortController();
     setExternalAbortController(abortController);
     generateGroupWrapper(false, 'normal', { signal: abortController.signal });
+=======
+    generateGroupWrapper();
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 }
 
 async function loadGroupChat(chatId) {
@@ -669,7 +679,10 @@ async function generateGroupWrapper(by_auto_mode, type = null, params = {}) {
                     if (streamingProcessor && !streamingProcessor.isFinished) {
                         await delay(100);
                     } else {
+<<<<<<< HEAD
                         await waitUntilCondition(() => streamingProcessor == null, 1000, 10);
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                         messagesBefore++;
                         break;
                     }

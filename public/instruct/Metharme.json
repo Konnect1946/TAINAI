@@ -3,10 +3,15 @@
     "system_prompt": "Enter roleplay mode. You must act as {{char}}, whose persona follows:",
     "input_sequence": "<|user|>",
     "output_sequence": "<|model|>",
+<<<<<<< HEAD
     "first_output_sequence": "",
     "last_output_sequence": "",
     "system_sequence_prefix": "<|system|>",
     "system_sequence_suffix": "",
+=======
+    "last_output_sequence": "",
+    "system_sequence": "<|system|>",
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     "stop_sequence": "</s>",
     "separator_sequence": "",
     "wrap": false,

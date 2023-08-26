@@ -18,7 +18,11 @@ import {
 import { groups, selected_group } from "./group-chats.js";
 import { instruct_presets } from "./instruct-mode.js";
 import { kai_settings } from "./kai-settings.js";
+<<<<<<< HEAD
 import { context_presets, power_user } from "./power-user.js";
+=======
+import { power_user } from "./power-user.js";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 import {
     textgenerationwebui_preset_names,
     textgenerationwebui_presets,
@@ -167,10 +171,13 @@ class PresetManager {
                 presets = textgenerationwebui_presets;
                 preset_names = textgenerationwebui_preset_names;
                 break;
+<<<<<<< HEAD
             case "context":
                 presets = context_presets;
                 preset_names = context_presets.map(x => x.name);
                 break;
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             case "instruct":
                 presets = instruct_presets;
                 preset_names = instruct_presets.map(x => x.name);
@@ -183,11 +190,19 @@ class PresetManager {
     }
 
     isKeyedApi() {
+<<<<<<< HEAD
         return this.apiId == "textgenerationwebui" || this.apiId == "context" || this.apiId == "instruct";
     }
 
     isNonGenericApi() {
         return this.apiId == "context" || this.apiId == "instruct";
+=======
+        return this.apiId == "textgenerationwebui" || this.apiId == "instruct";
+    }
+
+    isNonGenericApi() {
+        return this.apiId == "instruct";
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 
     updateList(name, preset) {
@@ -235,6 +250,7 @@ class PresetManager {
                     return nai_settings;
                 case "textgenerationwebui":
                     return textgenerationwebui_settings;
+<<<<<<< HEAD
                 case "context":
                     const context_preset = deepClone(power_user.context);
                     context_preset['name'] = name || power_user.context.preset;
@@ -243,6 +259,12 @@ class PresetManager {
                     const instruct_preset = deepClone(power_user.instruct);
                     instruct_preset['name'] = name || power_user.instruct.preset;
                     return instruct_preset;
+=======
+                case "instruct":
+                    const preset = deepClone(power_user.instruct);
+                    preset['name'] = name || power_user.instruct.preset;
+                    return preset;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 default:
                     console.warn(`Unknown API ID ${apiId}`);
                     return {};
@@ -254,8 +276,11 @@ class PresetManager {
             'streaming_url',
             'stopping_strings',
             'use_stop_sequence',
+<<<<<<< HEAD
             'can_use_tokenization',
             'can_use_streaming',
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             'preset_settings_novel',
             'streaming_novel',
             'nai_preamble',
@@ -399,11 +424,14 @@ jQuery(async () => {
             return;
         }
 
+<<<<<<< HEAD
         // default context preset cannot be deleted
         if (apiId == "context" && power_user.default_context === power_user.context.preset) {
             return;
         }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         const confirm = await callPopup('Delete the preset? This action is irreversible and your current settings will be overwritten.', 'confirm');
 
         if (!confirm) {

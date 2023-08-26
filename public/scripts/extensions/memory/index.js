@@ -567,7 +567,11 @@ jQuery(function () {
                     <div class="radio_group">
                         <label>
                             <input type="radio" name="memory_position" value="0" />
+<<<<<<< HEAD
                             After Main Prompt / Story String
+=======
+                            After scenario
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                         </label>
                         <label>
                             <input type="radio" name="memory_position" value="1" />

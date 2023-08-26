@@ -338,10 +338,13 @@ function onTagFilterClick(listElement) {
         }
     }
 
+<<<<<<< HEAD
     runTagFilters(listElement);
 }
 
 function runTagFilters(listElement) {
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const tagIds = [...($(listElement).find(".tag.selected:not(.actionable)").map((_, el) => $(el).attr("id")))];
     const excludedTagIds = [...($(listElement).find(".tag.excluded:not(.actionable)").map((_, el) => $(el).attr("id")))];
     const filterHelper = getFilterHelper($(listElement));
@@ -368,9 +371,12 @@ function printTagFilters(type = tag_filter_types.character) {
     }
     for (const tag of tagsToDisplay) {
         appendTagToList(FILTER_SELECTOR, tag, { removable: false, selectable: true, isGeneralList: true });
+<<<<<<< HEAD
         if (tag.excluded) {
             runTagFilters(FILTER_SELECTOR);
         }
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 
     for (const tagId of selectedTagIds) {

@@ -389,11 +389,18 @@ function onChatChanged() {
     $('#extension_floating_default_token_counter').text(tokenCounter3);
 }
 
+<<<<<<< HEAD
 /**
  * Inject author's note options and setup event listeners.
  */
 // Inserts the extension first since it's statically imported
 export function initAuthorsNote() {
+=======
+// Inject extension when extensions_activating is fired
+// Inserts the extension first since it's statically imported
+jQuery(async () => {
+    await waitUntilCondition(() => eventSource !== undefined);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     $('#extension_floating_prompt').on('input', onExtensionFloatingPromptInput);
     $('#extension_floating_interval').on('input', onExtensionFloatingIntervalInput);
     $('#extension_floating_depth').on('input', onExtensionFloatingDepthInput);
@@ -420,4 +427,8 @@ export function initAuthorsNote() {
     registerSlashCommand('freq', setNoteIntervalCommand, ['interval'], "<span class='monospace'>(number)</span> – sets an author's note insertion frequency", true, true);
     registerSlashCommand('pos', setNotePositionCommand, ['position'], "(<span class='monospace'>chat</span> or <span class='monospace'>scenario</span>) – sets an author's note position", true, true);
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+<<<<<<< HEAD
 }
+=======
+});
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0

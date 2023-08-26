@@ -152,6 +152,7 @@ let main_api = "kobold";
 let response_generate_novel;
 let characters = {};
 let response_dw_bg;
+<<<<<<< HEAD
 let first_run = true;
 
 
@@ -170,6 +171,12 @@ let color = {
     cyan: (mess) => color.byNum(mess, 36),
     white: (mess) => color.byNum(mess, 37)
 };
+=======
+let response_getstatus;
+let first_run = true;
+
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
 function get_mancer_headers() {
     const api_key_mancer = readSecret(SECRET_KEYS.MANCER);
@@ -331,8 +338,12 @@ const directories = {
     instruct: 'public/instruct',
     context: 'public/context',
     backups: 'backups/',
+<<<<<<< HEAD
     quickreplies: 'public/QuickReplies',
     assets: 'public/assets',
+=======
+    quickreplies: 'public/QuickReplies'
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 };
 
 // CSRF Protection //
@@ -382,10 +393,14 @@ app.use(CORS);
 
 if (listen && config.basicAuthMode) app.use(basicAuthMiddleware);
 
+<<<<<<< HEAD
 // IP Whitelist //
 let knownIPs = new Set();
 
 function getIpFromRequest(req) {
+=======
+app.use(function (req, res, next) { //Security
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     let clientIp = req.connection.remoteAddress;
     let ip = ipaddr.parse(clientIp);
     // Check if the IP address is IPv4-mapped IPv6 address
@@ -396,6 +411,7 @@ function getIpFromRequest(req) {
         clientIp = ip;
         clientIp = clientIp.toString();
     }
+<<<<<<< HEAD
     return clientIp;
 }
 
@@ -420,11 +436,38 @@ app.use(function (req, res, next) {
     //clientIp = req.connection.remoteAddress.split(':').pop();
     if (whitelistMode === true && !whitelist.some(x => ipMatching.matches(clientIp, ipMatching.getMatch(x)))) {
         console.log(color.red('Forbidden: Connection attempt from ' + clientIp + '. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of SillyTavern folder.\n'));
+=======
+
+    //clientIp = req.connection.remoteAddress.split(':').pop();
+    if (whitelistMode === true && !whitelist.some(x => ipMatching.matches(clientIp, ipMatching.getMatch(x)))) {
+        console.log('Forbidden: Connection attempt from ' + clientIp + '. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of SillyTavern folder.\n');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         return res.status(403).send('<b>Forbidden</b>: Connection attempt from <b>' + clientIp + '</b>. If you are attempting to connect, please add your IP address in whitelist or disable whitelist mode in config.conf in root of SillyTavern folder.');
     }
     next();
 });
 
+<<<<<<< HEAD
+=======
+app.use((req, res, next) => {
+    if (req.url.startsWith('/characters/') && is_colab && process.env.googledrive == 2) {
+
+        const filePath = path.join(charactersPath, decodeURIComponent(req.url.substr('/characters'.length)));
+        console.log('req.url: ' + req.url);
+        console.log(filePath);
+        fs.access(filePath, fs.constants.R_OK, (err) => {
+            if (!err) {
+                res.sendFile(filePath, { root: process.cwd() });
+            } else {
+                res.send('Character not found: ' + filePath);
+                //next();
+            }
+        });
+    } else {
+        next();
+    }
+});
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
 app.use(express.static(process.cwd() + "/public", { refresh: true }));
 
@@ -775,15 +818,24 @@ app.post("/getchat", jsonParser, function (request, response) {
     }
 });
 
+<<<<<<< HEAD
 app.post("/getstatus", jsonParser, async function (request, response) {
     if (!request.body) return response.sendStatus(400);
+=======
+app.post("/getstatus", jsonParser, async function (request, response_getstatus = response) {
+    if (!request.body) return response_getstatus.sendStatus(400);
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     api_server = request.body.api_server;
     main_api = request.body.main_api;
     if (api_server.indexOf('localhost') != -1) {
         api_server = api_server.replace('localhost', '127.0.0.1');
     }
+<<<<<<< HEAD
 
     const args = {
+=======
+    var args = {
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         headers: { "Content-Type": "application/json" }
     };
 
@@ -791,10 +843,16 @@ app.post("/getstatus", jsonParser, async function (request, response) {
         args.headers = Object.assign(args.headers, get_mancer_headers());
     }
 
+<<<<<<< HEAD
     const url = api_server + "/v1/model";
     let version = '';
     let koboldVersion = {};
 
+=======
+    var url = api_server + "/v1/model";
+    let version = '';
+    let koboldVersion = {};
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     if (main_api == "kobold") {
         try {
             version = (await getAsync(api_server + "/v1/info/version")).result;
@@ -812,6 +870,7 @@ app.post("/getstatus", jsonParser, async function (request, response) {
             };
         }
     }
+<<<<<<< HEAD
 
     try {
         let data = await getAsync(url, args);
@@ -834,6 +893,32 @@ app.post("/getstatus", jsonParser, async function (request, response) {
     }
 });
 
+=======
+    client.get(url, args, async function (data, response) {
+        if (typeof data !== 'object') {
+            data = {};
+        }
+        if (response.statusCode == 200) {
+            data.version = version;
+            data.koboldVersion = koboldVersion;
+            if (data.result == "ReadOnly") {
+                data.result = "no_connection";
+            }
+        } else {
+            data.response = data.result;
+            data.result = "no_connection";
+        }
+        response_getstatus.send(data);
+    }).on('error', function () {
+        response_getstatus.send({ result: "no_connection" });
+    });
+});
+
+const formatApiUrl = (url) => (url.indexOf('localhost') !== -1)
+    ? url.replace('localhost', '127.0.0.1')
+    : url;
+
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 function getVersion() {
     let pkgVersion = 'UNKNOWN';
     let gitRevision = null;
@@ -1940,7 +2025,11 @@ app.post("/generate_novelai", jsonParser, async function (request, response_gene
             "stop_sequences": request.body.stop_sequences,
             "bad_words_ids": badWordsList,
             "logit_bias_exp": logit_bias_exp,
+<<<<<<< HEAD
             "generate_until_sentence": request.body.generate_until_sentence,
+=======
+            //generate_until_sentence = true;
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
             "use_cache": request.body.use_cache,
             "use_string": true,
             "return_full_text": request.body.return_full_text,
@@ -3410,12 +3499,15 @@ async function sendClaudeRequest(request, response) {
         }
 
         console.log('Claude request:', requestPrompt);
+<<<<<<< HEAD
         const stop_sequences = ["\n\nHuman:", "\n\nSystem:", "\n\nAssistant:"];
 
         // Add custom stop sequences
         if (Array.isArray(request.body.stop)) {
             stop_sequences.push(...request.body.stop);
         }
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 
         const generateResponse = await fetch(api_url + '/complete', {
             method: "POST",
@@ -3424,7 +3516,11 @@ async function sendClaudeRequest(request, response) {
                 prompt: requestPrompt,
                 model: request.body.model,
                 max_tokens_to_sample: request.body.max_tokens,
+<<<<<<< HEAD
                 stop_sequences: stop_sequences,
+=======
+                stop_sequences: ["\n\nHuman:", "\n\nSystem:", "\n\nAssistant:"],
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
                 temperature: request.body.temperature,
                 top_p: request.body.top_p,
                 top_k: request.body.top_k,
@@ -3514,11 +3610,14 @@ app.post("/generate_openai", jsonParser, function (request, response_generate_op
         return response_generate_openai.status(401).send({ error: true });
     }
 
+<<<<<<< HEAD
     // Add custom stop sequences
     if (Array.isArray(request.body.stop)) {
         bodyParams['stop'] = request.body.stop;
     }
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     const isTextCompletion = Boolean(request.body.model && (request.body.model.startsWith('text-') || request.body.model.startsWith('code-')));
     const textPrompt = isTextCompletion ? convertChatMLPrompt(request.body.messages) : '';
     const endpointUrl = isTextCompletion ? `${api_url}/completions` : `${api_url}/chat/completions`;
@@ -3838,8 +3937,11 @@ function getPresetSettingsByAPI(apiId) {
             return { folder: directories.textGen_Settings, extension: '.settings' };
         case 'instruct':
             return { folder: directories.instruct, extension: '.json' };
+<<<<<<< HEAD
         case 'context':
             return { folder: directories.context, extension: '.json' };
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
         default:
             return { folder: null, extension: null };
     }
@@ -3875,6 +3977,7 @@ app.post("/tokenize_via_api", jsonParser, async function (request, response) {
 
         if (main_api == 'textgenerationwebui' && request.body.use_mancer) {
             args.headers = Object.assign(args.headers, get_mancer_headers());
+<<<<<<< HEAD
             const data = await postAsync(api_server + "/v1/token-count", args);
             return response.send({ count: data['results'][0]['tokens'] });
         }
@@ -3888,6 +3991,13 @@ app.post("/tokenize_via_api", jsonParser, async function (request, response) {
         else {
             return response.send({ error: true });
         }
+=======
+        }
+
+        const data = await postAsync(api_server + "/v1/token-count", args);
+        console.log(data);
+        return response.send({ count: data['results'][0]['tokens'] });
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     } catch (error) {
         console.log(error);
         return response.send({ error: true });
@@ -3971,14 +4081,22 @@ const setupTasks = async function () {
 
     if (autorun) open(autorunUrl.toString());
 
+<<<<<<< HEAD
     console.log(color.green('SillyTavern is listening on: ' + tavernUrl));
 
     if (listen) {
         console.log('\n0.0.0.0 means SillyTavern is listening on all network interfaces (Wi-Fi, LAN, localhost). If you want to limit it only to internal localhost (127.0.0.1), change the setting in config.conf to "listen=false". Check "access.log" file in the SillyTavern directory if you want to inspect incoming connections.\n');
+=======
+    console.log('\x1b[32mSillyTavern is listening on: ' + tavernUrl + '\x1b[0m');
+
+    if (listen) {
+        console.log('\n0.0.0.0 means SillyTavern is listening on all network interfaces (Wi-Fi, LAN, localhost). If you want to limit it only to internal localhost (127.0.0.1), change the setting in config.conf to “listen=false”\n');
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     }
 }
 
 if (listen && !config.whitelistMode && !config.basicAuthMode) {
+<<<<<<< HEAD
     if (config.securityOverride) {
         console.warn(color.red("Security has been overridden. If it's not a trusted network, change the settings."));
     }
@@ -3988,6 +4106,15 @@ if (listen && !config.whitelistMode && !config.basicAuthMode) {
     }
 }
 
+=======
+    if (config.securityOverride)
+        console.warn("Security has been override. If it's not a trusted network, change the settings.");
+    else {
+        console.error('Your SillyTavern is currently unsecurely open to the public. Enable whitelisting or basic authentication.');
+        process.exit(1);
+    }
+}
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 if (true === cliArguments.ssl)
     https.createServer(
         {
@@ -4099,8 +4226,11 @@ const SECRET_KEYS = {
     NOVEL: 'api_key_novel',
     CLAUDE: 'api_key_claude',
     DEEPL: 'deepl',
+<<<<<<< HEAD
     LIBRE: 'libre',
     LIBRE_URL: 'libre_url',
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
     OPENROUTER: 'api_key_openrouter',
     SCALE: 'api_key_scale',
     AI21: 'api_key_ai21',
@@ -4329,6 +4459,7 @@ app.post('/horde_generateimage', jsonParser, async (request, response) => {
     }
 });
 
+<<<<<<< HEAD
 app.post('/libre_translate', jsonParser, async (request, response) => {
     const key = readSecret(SECRET_KEYS.LIBRE);
     const url = readSecret(SECRET_KEYS.LIBRE_URL);
@@ -4369,6 +4500,8 @@ app.post('/libre_translate', jsonParser, async (request, response) => {
     }
 });
 
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 app.post('/google_translate', jsonParser, async (request, response) => {
     const { generateRequestUrl, normaliseResponse } = require('google-translate-api-browser');
 
@@ -5088,6 +5221,7 @@ app.post('/delete_extension', jsonParser, async (request, response) => {
         return response.status(500).send(`Server Error: ${error.message}`);
     }
 });
+<<<<<<< HEAD
 
 
 /**
@@ -5327,3 +5461,5 @@ app.post('/get_character_assets_list', jsonParser, async (request, response) => 
         return response.sendStatus(500);
     }
 });
+=======
+>>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
