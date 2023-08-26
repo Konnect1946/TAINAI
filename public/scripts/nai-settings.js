@@ -99,7 +99,6 @@ function loadNovelPreset(preset) {
         setGenerationParamsFromPreset(preset);
     }
 
-    $("#rep_pen_size_novel").attr('max', max_context);
     nai_settings.temperature = preset.temperature;
     nai_settings.repetition_penalty = preset.repetition_penalty;
     nai_settings.repetition_penalty_range = preset.repetition_penalty_range;
@@ -168,7 +167,6 @@ function loadNovelSettingsUi(ui_settings) {
     $("#rep_pen_novel").val(ui_settings.repetition_penalty);
     $("#rep_pen_counter_novel").text(Number(ui_settings.repetition_penalty).toFixed(2));
     $("#rep_pen_size_novel").val(ui_settings.repetition_penalty_range);
-    $("#rep_pen_size_novel").attr('max', max_context);
     $("#rep_pen_size_counter_novel").text(Number(ui_settings.repetition_penalty_range).toFixed(0));
     $("#rep_pen_slope_novel").val(ui_settings.repetition_penalty_slope);
     $("#rep_pen_slope_counter_novel").text(Number(`${ui_settings.repetition_penalty_slope}`).toFixed(2));
@@ -185,7 +183,7 @@ function loadNovelSettingsUi(ui_settings) {
     $("#top_a_novel").val(ui_settings.top_a);
     $("#top_a_counter_novel").text(Number(ui_settings.top_a).toFixed(2));
     $("#typical_p_novel").val(ui_settings.typical_p);
-    $("#typical_p_counter_novel").text(Number(ui_settings.typical_p).toFixed(2));
+    $("#typical_p_counter_novel").text(Number(ui_settings.typical_p).toFixed(3));
     $("#cfg_scale_novel").val(ui_settings.cfg_scale);
     $("#cfg_scale_counter_novel").text(Number(ui_settings.cfg_scale).toFixed(2));
     $("#phrase_rep_pen_novel").val(ui_settings.phrase_rep_pen || "off");
@@ -269,8 +267,8 @@ const sliders = [
     {
         sliderId: "#typical_p_novel",
         counterId: "#typical_p_counter_novel",
-        format: (val) => Number(val).toFixed(2),
-        setValue: (val) => { nai_settings.typical_p = Number(val).toFixed(2); },
+        format: (val) => Number(val).toFixed(3),
+        setValue: (val) => { nai_settings.typical_p = Number(val).toFixed(3); },
     },
     {
         sliderId: "#mirostat_tau_novel",

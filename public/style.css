@@ -67,6 +67,15 @@
 
     color-scheme: only light;
 
+    /* Send form variables */
+    --bottomFormBlockPadding: calc(var(--mainFontSize) / 3);
+    --bottomFormIconSize: calc(var(--mainFontSize) * 2);
+    --bottomFormBlockSize: calc(var(--bottomFormIconSize) + var(--bottomFormBlockPadding));
+
+    /*Top Bar Scaling Variables*/
+    --topBarIconSize: calc(var(--mainFontSize) * 2);
+    --topBarBlockSize: calc(var(--topBarIconSize) + var(--topBarBlockPadding));
+    --topBarBlockPadding: calc(var(--mainFontSize) / 3);
 
     /*styles for the color picker*/
     --tool-cool-color-picker-btn-bg: transparent;
@@ -377,7 +386,7 @@ hr {
     left: 0;
     right: 0;
     display: inline-block;
-    height: 35px;
+    height: var(--bottomFormBlockSize);
     position: absolute;
     border-bottom: 1px solid var(--grey30a);
     box-shadow: 0 2px 20px 0 var(--black70a);
@@ -390,14 +399,15 @@ hr {
 #sheld {
     display: grid;
     grid-template-rows: auto min-content;
-    height: calc(100vh - 36px);
-    height: calc(100svh - 36px);
+    height: calc(100vh - var(--topBarBlockSize));
+    height: calc(100svh - var(--topBarBlockSize));
+    max-height: calc(100svh - var(--topBarBlockSize));
     overflow-x: hidden;
     /* max-width: 50vw; */
     position: absolute;
     left: calc((100vw - var(--sheldWidth))/2);
     left: calc((100svw - var(--sheldWidth))/2);
-    top: 36px;
+    top: var(--topBarBlockSize);
     margin: 0 auto;
     left: 0;
     right: 0;
@@ -462,7 +472,7 @@ hr {
 }
 
 #chat {
-    max-height: calc(100vh - 42px);
+    max-height: calc(100vh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
     overflow-x: hidden;
     padding-bottom: 0;
     overflow-y: scroll;
@@ -513,19 +523,19 @@ hr {
 #send_but_sheld {
     padding: 0;
     border: 0;
-    height: 30px;
+    height: var(--bottomFormBlockSize);
     position: relative;
     background-position: center;
     display: flex;
     flex-direction: row;
     column-gap: 5px;
-    font-size: 25px;
+    font-size: var(--bottomFormIconSize);
     overflow: hidden;
 }
 
 #send_but_sheld>div {
-    width: 30px;
-    height: 30px;
+    width: var(--bottomFormBlockSize);
+    height: var(--bottomFormBlockSize);
     margin: 0;
     outline: none;
     border: none;
@@ -556,8 +566,9 @@ hr {
 }
 
 #options_button {
-    width: 30px;
-    height: 30px;
+    width: var(--bottomFormBlockSize);
+    height: var(--bottomFormBlockSize);
+    font-size: var(--bottomFormIconSize);
     margin: 0;
     outline: none;
     border: none;
@@ -568,7 +579,6 @@ hr {
     margin-left: 10px;
     padding: 0;
     transition: 0.3s;
-    font-size: 25px;
     display: flex;
     align-items: center;
 }
@@ -879,11 +889,11 @@ select {
 }
 
 #send_textarea {
-    min-height: 30px;
+    min-height: var(--bottomFormBlockSize);
+    height: var(--bottomFormBlockSize);
     max-height: 50vh;
     max-height: 50svh;
     word-wrap: break-word;
-    height: 30px;
     resize: vertical;
     display: block;
     background-color: rgba(255, 0, 0, 0);
@@ -906,12 +916,22 @@ select {
     white-space: nowrap;
 }
 
+@media screen and (max-width: 1000px) {
+    #form_create textarea {
+        flex-grow: 1;
+    }
+}
 
+@media screen and (min-width: 1001px) {
+    #description_textarea {
+        height: 33vh;
+        height: 33svh;
+    }
 
-#description_textarea,
-#firstmessage_textarea {
-    height: -webkit-fill-available;
-    width: -moz-available;
+    #firstmessage_textarea {
+        resize: none;
+        flex: 1;
+    }
 }
 
 #character_name_pole {
@@ -1271,6 +1291,10 @@ select option:not(:checked) {
     color: var(--active) !important;
 }
 
+#context_set_default.default {
+    color: var(--preferred) !important;
+}
+
 #instruct_set_default.default {
     color: var(--preferred) !important;
 }
@@ -1538,10 +1562,6 @@ input[type=search]:focus::-webkit-search-cancel-button {
     flex-direction: column;
     height: 100%;
     overflow-y: auto;
-}
-
-#form_create textarea {
-    flex-grow: 1;
 }
 
 .avatar_div {
@@ -2440,7 +2460,7 @@ input[type="range"]::-webkit-slider-thumb {
     margin-right: auto;
     left: 0;
     right: 0;
-    top: 40px;
+    top: var(--topBarBlockSize);
     box-shadow: 0 0 20px var(--black70a);
     padding: 10px;
     border: 1px solid var(--black30a);
@@ -2525,8 +2545,8 @@ h5 {
     grid-template-rows: auto auto;
     max-width: var(--sheldWidth);
     height: min-content;
-    max-height: calc(100vh - 40px);
-    max-height: calc(100svh - 40px);
+    max-height: calc(100vh - var(--topBarBlockSize));
+    max-height: calc(100svh - var(--topBarBlockSize));
     min-height: 100px;
     position: absolute;
     z-index: 2066;
@@ -2887,10 +2907,10 @@ a {
 #right-nav-panel {
     width: calc((100vw - var(--sheldWidth) - 2px) /2);
     width: calc((100svw - var(--sheldWidth) - 2px) /2);
-    max-height: calc(100vh - 42px);
-    max-height: calc(100svh - 42px);
-    height: calc(100vh - 42px);
-    height: calc(100svh - 42px);
+    max-height: calc(100vh - var(--topBarBlockSize));
+    max-height: calc(100svh - var(--topBarBlockSize));
+    height: calc(100vh - var(--topBarBlockSize));
+    height: calc(100svh - var(--topBarBlockSize));
     position: fixed;
     top: 0;
     margin: 0;
@@ -3022,31 +3042,28 @@ a {
 /*------------ TOP SIDE SETTINGS ----------------*/
 
 #top-settings-holder {
+    display: flex;
     margin: 0 auto;
-    padding-top: 2px;
-    height: 30px;
-    /* max-width: var(--sheldWidth); */
+    height: var(--topBarBlockSize);
     justify-content: center;
-    display: grid;
-    grid-template-columns: 10% 10% 10% 10% 10% 10% 10% 10% 10%;
     z-index: 3000;
     position: relative;
-    grid-gap: 1%;
     width: var(--sheldWidth);
 
 }
 
 .drawer {
     align-items: center;
+    justify-content: center;
     display: flex;
-    flex-flow: column;
+    flex-flow: row;
     width: 100%;
 }
 
 .drawer-icon {
     display: inline-block;
     cursor: pointer;
-    font-size: 25px;
+    font-size: var(--topBarIconSize);
 }
 
 .drawer-icon.openIcon {
@@ -3119,11 +3136,11 @@ a {
     min-width: 450px;
     width: var(--sheldWidth);
     overflow-y: auto;
-    max-height: calc(100vh - 70px);
-    max-height: calc(100svh - 70px);
+    max-height: calc(100vh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
+    max-height: calc(100svh - calc(var(--topBarBlockSize) + var(--bottomFormBlockSize)));
     display: none;
     position: absolute;
-    top: 41px;
+    top: var(--topBarBlockSize);
     left: 0;
     right: 0;
     margin: 0 auto;
@@ -3145,10 +3162,10 @@ a {
 .fillLeft {
     width: calc((100vw - var(--sheldWidth) - 2px) /2);
     width: calc((100svw - var(--sheldWidth) - 2px) /2);
-    height: calc(100vh - 42px);
-    height: calc(100svh - 42px);
-    max-height: calc(100vh - 42px);
-    max-height: calc(100svh - 42px);
+    height: calc(100vh - var(--topBarBlockSize));
+    height: calc(100svh - var(--topBarBlockSize));
+    max-height: calc(100vh - var(--topBarBlockSize));
+    max-height: calc(100svh - var(--topBarBlockSize));
     position: fixed;
     top: 0;
     margin: 0;

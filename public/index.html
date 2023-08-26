@@ -45,6 +45,7 @@
     <script src="lib/pagination.js"></script>
     <script src="lib/toolcool-color-picker.js"></script>
     <script src="lib/svg-inject.js"></script>
+    <script type="module" src="lib/structured-clone/monkey-patch.js"></script>
     <script type="module" src="lib/swiped-events.js"></script>
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/power-user.js"></script>
@@ -366,7 +367,7 @@
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
-                                            <input type="range" id="rep_pen_size_novel" name="volume" min="0" max="2048" step="1">
+                                            <input type="range" id="rep_pen_size_novel" name="volume" min="0" max="8192" step="1">
                                         </div>
                                         <div class="range-block-counter">
                                             <div contenteditable="true" data-for="rep_pen_size_novel" id="rep_pen_size_counter_novel">
@@ -1022,7 +1023,7 @@
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
-                                            <input type="range" id="typical_p_novel" name="volume" min="0" max="1" step="0.01">
+                                            <input type="range" id="typical_p_novel" name="volume" min="0" max="1" step="0.001">
                                         </div>
                                         <div class="range-block-counter">
                                             <div contenteditable="true" data-for="typical_p_novel" id="typical_p_counter_novel">
@@ -2089,22 +2090,28 @@
                             <h4 data-i18n="Context Template">
                                 Context Template
                             </h4>
-                            <div class="flex-container flexGap5">
-                                <select id="context_presets" class="flex1 margin0">
-                                </select>
+                            <div class="preset_buttons">
+                                <select id="context_presets" data-preset-manager-for="context" class="flex1"></select>
+                                <input type="file" hidden data-preset-manager-file="context" accept=".json, .settings">
+                                <i id="context_set_default" class="menu_button fa-solid fa-heart" title="Auto-select this preset for Instruct Mode."></i>
+                                <i data-preset-manager-update="context" class="menu_button fa-solid fa-save" title="Update current preset" data-i18n="[title]Update current preset"></i>
+                                <i data-preset-manager-new="context" class="menu_button fa-solid fa-plus" title="Create new preset" data-i18n="[title]Create new preset"></i>
+                                <i data-preset-manager-import="context" class="menu_button fa-solid fa-file-import" title="Import preset" data-i18n="[title]Import preset"></i>
+                                <i data-preset-manager-export="context" class="menu_button fa-solid fa-file-export" title="Export preset" data-i18n="[title]Export preset"></i>
+                                <i id="context_delete_preset" data-preset-manager-delete="context" class="menu_button fa-solid fa-trash-can" title="Delete the preset" data-i18n="[title]Delete the preset"></i>
                             </div>
                             <div>
                                 <label for="context_story_string">
                                     <small data-i18n="Story String">Story String</small>
                                 </label>
-                                <textarea id="context_story_string" class="text_pole textarea_compact" rows="6"></textarea>
+                                <textarea id="context_story_string" class="text_pole textarea_compact autoSetHeight" rows="1"></textarea>
                                 <div class="flex-container">
                                     <div class="flex1">
                                         <label for="context_example_separator">
                                             <small data-i18n="Example Separator">Example Separator</small>
                                         </label>
                                         <div>
-                                            <textarea id="context_example_separator" class="text_pole textarea_compact" maxlength="500" rows="2"></textarea>
+                                            <textarea id="context_example_separator" class="text_pole textarea_compact autoSetHeight" maxlength="500" rows="1"></textarea>
                                         </div>
                                     </div>
                                     <div class="flex1">
@@ -2112,7 +2119,7 @@
                                             <small data-i18n="Chat Start">Chat Start</small>
                                         </label>
                                         <div>
-                                            <textarea id="context_chat_start" class="text_pole textarea_compact" maxlength="500" rows="2"></textarea>
+                                            <textarea id="context_chat_start" class="text_pole textarea_compact autoSetHeight" maxlength="500" rows="1"></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -2129,7 +2136,6 @@
                                     <input id="instruct_enabled" type="checkbox" />
                                     <span data-i18n="Enabled">Enabled</span>
                                 </label>
-                            </div>
                             </div>
                             <label for="instruct_presets">
                                 <span data-i18n="Presets">Presets</span>
@@ -2150,7 +2156,7 @@
                                 </small>
                             </label>
                             <div>
-                                <textarea id="instruct_activation_regex" class="text_pole textarea_compact" maxlength="5000" rows="1"></textarea>
+                                <textarea id="instruct_activation_regex" class="text_pole textarea_compact autoSetHeight" maxlength="5000" rows="1"></textarea>
                             </div>
                             <div>
                                 <label for="instruct_wrap" class="checkbox_label">
@@ -2169,65 +2175,96 @@
                                     <input id="instruct_names_force_groups" type="checkbox" />
                                     <span data-i18n="Force for Groups and Personas">Force for Groups and Personas</span>
                                 </label>
+                            </div>
                             <label>
                                 <small data-i18n="System Prompt">System Prompt</small>
                             </label>
                             <div class="prompt_overridden">
                                 Overridden by the Character Definitions.
                             </div>
-                            <textarea id="instruct_system_prompt" class="text_pole textarea_compact" rows="4"></textarea>
-                            <div class="flex-container">
-                                <div class="flex1">
-                                    <label for="instruct_input_sequence">
-                                        <small data-i18n="Input Sequence">Input Sequence</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_input_sequence" class="text_pole textarea_compact" maxlength="500" rows="2"></textarea>
-                                    </div>
+                            <textarea id="instruct_system_prompt" class="text_pole textarea_compact autoSetHeight" rows="1"></textarea>
+
+                            <div class="inline-drawer wide100p flexFlowColumn">
+                                <div class="inline-drawer-toggle inline-drawer-header">
+                                    <b><span data-i18n="Instruct Mode Sequences">Instruct Mode Sequences</span></b>
+                                    <div class="fa-solid fa-circle-chevron-down inline-drawer-icon down"></div>
                                 </div>
-                                <div class="flex1">
-                                    <label for="instruct_output_sequence">
-                                        <small data-i18n="Output Sequence">Output Sequence</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_output_sequence" class="text_pole wide100p textarea_compact" maxlength="500" rows="2"></textarea>
+                                <div class="inline-drawer-content">
+                                    <div class="flex-container">
+                                        <div class="flex1">
+                                            <label for="instruct_input_sequence">
+                                                <small data-i18n="Input Sequence">Input Sequence</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_input_sequence" class="text_pole textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="flex1">
+                                            <label for="instruct_output_sequence">
+                                                <small data-i18n="Output Sequence">Output Sequence</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_output_sequence" class="text_pole wide100p textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="flex1">
-                                    <label for="instruct_last_output_sequence">
-                                        <small data-i18n="Last Sequence">Last Sequence</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_last_output_sequence" class="text_pole wide100p textarea_compact" maxlength="500" rows="2"></textarea>
+                                    <div class="flex-container">
+                                        <div class="flex1">
+                                            <label for="instruct_first_output_sequence">
+                                                <small data-i18n="First Output Sequence">First Output Sequence</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_first_output_sequence" class="text_pole textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="flex1">
+                                            <label for="instruct_last_output_sequence">
+                                                <small data-i18n="Last Output Sequence">Last Output Sequence</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_last_output_sequence" class="text_pole wide100p textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-container">
+                                        <div class="flex1">
+                                            <label for="instruct_system_sequence_prefix">
+                                                <small data-i18n="System Sequence Prefix">System Sequence Prefix</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_system_sequence_prefix" class="text_pole textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="flex1">
+                                            <label for="instruct_system_sequence_suffix">
+                                                <small data-i18n="System Sequence Suffix">System Sequence Suffix</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_system_sequence_suffix" class="text_pole wide100p textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-container">
+                                        <div class="flex1">
+                                            <label for="instruct_stop_sequence">
+                                                <small data-i18n="Stop Sequence">Stop Sequence</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_stop_sequence" class="text_pole textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="flex1">
+                                            <label for="instruct_separator_sequence">
+                                                <small data-i18n="Separator">Separator</small>
+                                            </label>
+                                            <div>
+                                                <textarea id="instruct_separator_sequence" class="text_pole wide100p textarea_compact autoSetHeight" maxlength="500" placeholder="&mdash;" rows="1"></textarea>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex-container">
-                                <div class="flex1">
-                                    <label for="instruct_system_sequence">
-                                        <small data-i18n="System Sequence">System Sequence</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_system_sequence" class="text_pole textarea_compact" maxlength="500" rows="2"></textarea>
-                                    </div>
-                                </div>
-                                <div class="flex1">
-                                    <label for="instruct_stop_sequence">
-                                        <small data-i18n="Stop Sequence">Stop Sequence</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_stop_sequence" class="text_pole wide100p textarea_compact" maxlength="500" rows="2"></textarea>
-                                    </div>
-                                </div>
-                                <div class="flex1">
-                                    <label for="instruct_separator_sequence">
-                                        <small data-i18n="Separator">Separator</small>
-                                    </label>
-                                    <div>
-                                        <textarea id="instruct_separator_sequence" class="text_pole wide100p textarea_compact" maxlength="500" rows="2"></textarea>
-                                    </div>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
                     <div name="ContextFormatting" class="flex1">
@@ -2245,7 +2282,7 @@
                                 <option value="3">Sentencepiece (LLaMA)</option>
                                 <option value="4">NerdStash (NovelAI Clio)</option>
                                 <option value="5">NerdStash v2 (NovelAI Kayra)</option>
-                                <option value="6">API (WebUI)</option>
+                                <option value="6">API (WebUI / koboldcpp)</option>
                             </select>
                         </div>
                         <div class="range-block">
@@ -2314,9 +2351,14 @@
                                 </div>
                             </div>
                             <h4>
-                                <span data-i18n="Custom Stopping Strings">
-                                    Custom Stopping Strings (KoboldAI/TextGen/NovelAI)
-                                </span>
+                                <div class="range-block-title justifyLeft">
+                                    <span data-i18n="Custom Stopping Strings">
+                                        Custom Stopping Strings
+                                    </span>
+                                    <a href="https://docs.sillytavern.app/usage/core-concepts/advancedformatting/#custom-stopping-strings" class="notes-link" target="_blank">
+                                        <span class="note-link-span">?</span>
+                                    </a>
+                                </div>
                                 <div>
                                     <small>
                                         <span data-i18n="JSON serialized array of strings">JSON serialized array of strings, for example:</span><br>
@@ -2467,7 +2509,7 @@
                                     </div>
                                     <div class="range-block-range-and-counter ">
                                         <div class="range-block-range paddingLeftRight5">
-                                            <input type="range" id="world_info_budget_cap" name="volume" min="0" max="8192" step="256">
+                                            <input type="range" id="world_info_budget_cap" name="volume" min="0" max="8192" step="1">
                                         </div>
                                         <div class="range-block-counter margin0">
                                             <div contenteditable="true" data-for="world_info_budget_cap" id="world_info_budget_cap_counter">
@@ -2592,7 +2634,7 @@
                                     </div>
                                     <div class="range-block-range-and-counter">
                                         <div class="range-block-range">
-                                            <input type="range" id="font_scale" name="font_scale" min="0.8" max="1.2" step="0.05">
+                                            <input type="range" id="font_scale" name="font_scale" min="0.8" max="1.2" step="0.02">
                                         </div>
                                         <div class="range-block-counter">
                                             <div contenteditable="true" data-for="font_scale" id="font_scale_counter">
@@ -2826,6 +2868,12 @@
                             <label for="prefer_character_jailbreak" title="If checked and the character card contains a jailbreak override (Post History Instruction), use that instead." data-i18n="[title]If checked and the character card contains a jailbreak override (Post History Instruction), use that instead." class="checkbox_label">
                                 <input id="prefer_character_jailbreak" type="checkbox" />
                                 <span data-i18n="Prefer Character Card Jailbreak">Prefer Char. JB</span>
+                            </label>
+                            <label class="checkbox_label" for="continue_on_send">
+                                <input id="continue_on_send" type="checkbox" />
+                                <span data-i18n="Press Send to continue">
+                                    Press "Send" to continue
+                                </span>
                             </label>
                             <label class="checkbox_label" for="quick_continue">
                                 <input id="quick_continue" type="checkbox" />
@@ -4115,7 +4163,7 @@
                         <div class="floating_prompt_radio_group">
                             <label>
                                 <input type="radio" name="extension_floating_position" value="0" />
-                                After scenario
+                                After Main Prompt / Story String
                             </label>
                             <label>
                                 <input type="radio" name="extension_floating_position" value="1" />
@@ -4183,7 +4231,7 @@
                         <div class="floating_prompt_radio_group">
                             <label>
                                 <input type="radio" name="extension_default_position" value="0" />
-                                After scenario
+                                After Main Prompt / Story String
                             </label>
                             <label>
                                 <input type="radio" name="extension_default_position" value="1" />

@@ -29,7 +29,7 @@ import {
 import { registerSlashCommand } from "./slash-commands.js";
 import { tokenizers } from "./tokenizers.js";
 
-import { delay } from "./utils.js";
+import { delay, resetScrollHeight } from "./utils.js";
 
 export {
     loadPowerUserSettings,
@@ -46,7 +46,7 @@ export {
 export const MAX_CONTEXT_DEFAULT = 4096;
 const MAX_CONTEXT_UNLOCKED = 65536;
 
-const defaultStoryString =  "{{#if system}}{{system}}\n{{/if}}{{#if description}}{{description}}\n{{/if}}{{#if personality}}{{char}}'s personality: {{personality}}\n{{/if}}{{#if scenario}}Scenario: {{scenario}}\n{{/if}}{{#if persona}}{{persona}}\n{{/if}}";
+const defaultStoryString = "{{#if system}}{{system}}\n{{/if}}{{#if description}}{{description}}\n{{/if}}{{#if personality}}{{char}}'s personality: {{personality}}\n{{/if}}{{#if scenario}}Scenario: {{scenario}}\n{{/if}}{{#if persona}}{{persona}}\n{{/if}}";
 const defaultExampleSeparator = '***';
 const defaultChatStart = '***';
 
@@ -152,27 +152,31 @@ let power_user = {
     prefer_character_prompt: true,
     prefer_character_jailbreak: true,
     quick_continue: false,
+    continue_on_send: false,
     trim_spaces: true,
     relaxed_api_urls: false,
 
     default_instruct: '',
     instruct: {
         enabled: false,
+        preset: "Alpaca",
+        system_prompt: "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\nWrite {{char}}'s next reply in a fictional roleplay chat between {{user}} and {{char}}.\n",
+        input_sequence: "### Instruction:",
+        output_sequence: "### Response:",
+        first_output_sequence: "",
+        last_output_sequence: "",
+        system_sequence_prefix: "",
+        system_sequence_suffix: "",
+        stop_sequence: "",
+        separator_sequence: "",
         wrap: true,
+        macro: true,
         names: false,
-        system_prompt: "Below is an instruction that describes a task. Write a response that appropriately completes the request.\n\nWrite {{char}}'s next reply in a fictional roleplay chat between {{user}} and {{char}}. Write 1 reply only.",
-        system_sequence: '',
-        stop_sequence: '',
-        input_sequence: '### Instruction:',
-        output_sequence: '### Response:',
-        last_output_sequence: '',
-        preset: 'Alpaca',
-        separator_sequence: '',
-        macro: false,
         names_force_groups: true,
-        activation_regex: '',
+        activation_regex: "",
     },
 
+    default_context: 'Default',
     context: {
         preset: 'Default',
         story_string: defaultStoryString,
@@ -481,9 +485,19 @@ async function applyShadowWidth() {
 
 }
 
-async function applyFontScale() {
+async function applyFontScale(type) {
+
     power_user.font_scale = Number(localStorage.getItem(storage_keys.font_scale) ?? 1);
-    document.documentElement.style.setProperty('--fontScale', power_user.font_scale);
+    //this is to allow forced setting on page load, theme swap, etc
+    if (type === 'forced') {
+        document.documentElement.style.setProperty('--fontScale', power_user.font_scale);
+    } else {
+        //this is to prevent the slider from updating page in real time
+        $("#font_scale").off('mouseup touchend').on('mouseup touchend', () => {
+            document.documentElement.style.setProperty('--fontScale', power_user.font_scale);
+        })
+    }
+
     $("#font_scale_counter").text(power_user.font_scale);
     $("#font_scale").val(power_user.font_scale);
 }
@@ -521,7 +535,7 @@ async function applyTheme(name) {
             key: 'font_scale',
             action: async () => {
                 localStorage.setItem(storage_keys.font_scale, power_user.font_scale);
-                await applyFontScale();
+                await applyFontScale('forced');
             }
         },
         {
@@ -640,7 +654,7 @@ async function applyMovingUIPreset(name) {
 }
 
 switchUiMode();
-applyFontScale();
+applyFontScale('forced');
 applyThemeColor();
 applyChatWidth();
 applyAvatarStyle();
@@ -708,6 +722,7 @@ function loadPowerUserSettings(settings, data) {
 
     $('#relaxed_api_urls').prop("checked", power_user.relaxed_api_urls);
     $('#trim_spaces').prop("checked", power_user.trim_spaces);
+    $('#continue_on_send').prop("checked", power_user.continue_on_send);
     $('#quick_continue').prop("checked", power_user.quick_continue);
     $('#mes_continue').css('display', power_user.quick_continue ? '' : 'none');
     $('#auto_swipe').prop("checked", power_user.auto_swipe);
@@ -863,13 +878,16 @@ function loadMaxContextUnlocked() {
 }
 
 function switchMaxContextSize() {
-    const element = $('#max_context');
+    const elements = [$('#max_context'), $('#rep_pen_range'), $('#rep_pen_range_textgenerationwebui')];
     const maxValue = power_user.max_context_unlocked ? MAX_CONTEXT_UNLOCKED : MAX_CONTEXT_DEFAULT;
-    element.attr('max', maxValue);
-    const value = Number(element.val());
 
-    if (value >= maxValue) {
-        element.val(maxValue).trigger('input');
+    for (const element of elements) {
+        element.attr('max', maxValue);
+        const value = Number(element.val());
+
+        if (value >= maxValue) {
+            element.val(maxValue).trigger('input');
+        }
     }
 }
 
@@ -892,6 +910,9 @@ function loadContextSettings() {
         $element.on('input', function () {
             power_user.context[control.property] = control.isCheckbox ? !!$(this).prop('checked') : $(this).val();
             saveSettingsDebounced();
+            if (!control.isCheckbox) {
+                resetScrollHeight($element);
+            }
         });
     });
 
@@ -934,7 +955,31 @@ function loadContextSettings() {
                 break;
             }
         }
+
+        highlightDefaultContext();
+
+        saveSettingsDebounced();
     });
+
+    $('#context_set_default').on('click', function () {
+        if (power_user.context.preset !== power_user.default_context) {
+            power_user.default_context = power_user.context.preset;
+            $(this).addClass('default');
+            toastr.info(`Default context template set to ${power_user.default_context}`);
+
+            highlightDefaultContext();
+
+            saveSettingsDebounced();
+        }
+    });
+
+    highlightDefaultContext();
+}
+
+function highlightDefaultContext() {
+    $('#context_set_default').toggleClass('default', power_user.default_context === power_user.context.preset);
+    $('#context_set_default').toggleClass('disabled', power_user.default_context === power_user.context.preset);
+    $('#context_delete_preset').toggleClass('disabled', power_user.default_context === power_user.context.preset);
 }
 
 export function fuzzySearchCharacters(searchValue) {
@@ -998,17 +1043,35 @@ export function fuzzySearchGroups(searchValue) {
     return ids;
 }
 
+/**
+ * Renders a story string template with the given parameters.
+ * @param {object} params Template parameters.
+ * @returns {string} The rendered story string.
+ */
 export function renderStoryString(params) {
     try {
+        // compile the story string template into a function, with no HTML escaping
         const compiledTemplate = Handlebars.compile(power_user.context.story_string, { noEscape: true });
+
+        // render the story string template with the given params
         let output = compiledTemplate(params);
+
+        // substitute {{macro}} params that are not defined in the story string
         output = substituteParams(output, params.user, params.char);
-        output = `${output.trim()}\n`; // add a newline to the end
+
+        // remove leading whitespace
+        output = output.trimStart();
+
+        // add a newline to the end of the story string if it doesn't have one
+        if (!output.endsWith('\n')) {
+            output += '\n';
+        }
+
         return output;
     } catch (e) {
         toastr.error('Check the story string template for validity', 'Error rendering story string');
         console.error('Error rendering story string', e);
-        throw e;
+        throw e; // rethrow the error
     }
 }
 
@@ -1525,8 +1588,19 @@ function setAvgBG() {
 
 }
 
-export function getCustomStoppingStrings() {
+
+/**
+ * Gets the custom stopping strings from the power user settings.
+ * @param {number | undefined} limit Number of strings to return. If undefined, returns all strings.
+ * @returns {string[]} An array of custom stopping strings
+ */
+export function getCustomStoppingStrings(limit = undefined) {
     try {
+        // If there's no custom stopping strings, return an empty array
+        if (!power_user.custom_stopping_strings) {
+            return [];
+        }
+
         // Parse the JSON string
         const strings = JSON.parse(power_user.custom_stopping_strings);
 
@@ -1535,8 +1609,8 @@ export function getCustomStoppingStrings() {
             return [];
         }
 
-        // Make sure all the elements are strings
-        return strings.filter((s) => typeof s === 'string');
+        // Make sure all the elements are strings. Apply the limit.
+        return strings.filter((s) => typeof s === 'string').slice(0, limit);
     } catch (error) {
         // If there's an error, return an empty array
         console.warn('Error parsing custom stopping strings:', error);
@@ -1965,6 +2039,12 @@ $(document).ready(() => {
     $("#prefer_character_jailbreak").on("input", function () {
         const value = !!$(this).prop('checked');
         power_user.prefer_character_jailbreak = value;
+        saveSettingsDebounced();
+    });
+
+    $("#continue_on_send").on("input", function () {
+        const value = !!$(this).prop('checked');
+        power_user.continue_on_send = value;
         saveSettingsDebounced();
     });
 
