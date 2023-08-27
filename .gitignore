@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 
 public/chats/
 public/characters/
-=======
-
-public/chats/
-
->>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 public/User Avatars/
 public/backgrounds/
 public/groups/
@@ -17,26 +11,17 @@ public/css/bg_load.css
 public/themes/
 public/OpenAI Settings/
 public/KoboldAI Settings/
-<<<<<<< HEAD
 public/NovelAI Settings/
 public/TextGen Settings/
 
 
-=======
-
-public/scripts/extensions/third-party/
->>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 public/stats.json
 /uploads/
 *.jsonl
 /config.conf
 /docker/config
 .DS_Store
-<<<<<<< HEAD
 public/settings.json
-=======
-
->>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
 /thumbnails
 whitelist.txt
 .vscode
@@ -47,8 +32,5 @@ public/movingUI/
 public/QuickReplies/
 content.log
 cloudflared.exe
-<<<<<<< HEAD
 public/assets/
 access.log
-=======
->>>>>>> 3ded003ea94aa26ac574896247116e6acbd03ca0
